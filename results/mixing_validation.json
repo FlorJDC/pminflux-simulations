@@ -1,0 +1,217 @@
+{
+ "params": {
+  "K": 4,
+  "T_ns": 50.0,
+  "tau_ns": 4.21,
+  "window_start_ns": 0.0,
+  "window_width_ns": 10.1
+ },
+ "C_no_irf": [
+  [
+   0.9092021336729776,
+   0.0001230953547981528,
+   0.002397256979358109,
+   0.04668609172542515
+  ],
+  [
+   0.04668609172542515,
+   0.9092021336729776,
+   0.0001230953547981528,
+   0.002397256979358109
+  ],
+  [
+   0.002397256979358109,
+   0.04668609172542515,
+   0.9092021336729776,
+   0.0001230953547981528
+  ],
+  [
+   0.0001230953547981528,
+   0.002397256979358109,
+   0.04668609172542515,
+   0.9092021336729776
+  ]
+ ],
+ "n_detected_total": 4156448,
+ "rate_per_cycle": 0.001,
+ "chi2_pvalue_mixing_vs_sim_exp": 0.12927426557681765,
+ "chi2_pvalue_naive_vs_sim_exp": 0.0,
+ "definitions": {
+  "C": "C[i][j] = P(foton del haz j en la ventana i), periodico, sin IRF",
+  "rate_per_cycle": "(Ns+Nb)/M_p de cada llamada (fotones detectados por ciclo TCSPC)",
+  "n_detected_total": "suma sobre llamadas de fotones dentro de las K ventanas (nMINFLUX)",
+  "mixing_model": "p_i ~ Ns*sum_j C_ij lam_j/sum(lam) + Nb*b/T, normalizado en ventanas",
+  "naive_model": "pos_MINFLUX/crb_minflux: SBR/(SBR+1) lam_i/sum(lam) + 1/(SBR+1)/K",
+  "chi2": "Pearson, K-1 = 3 g.l., condicionado al total en ventanas, conteos sumados",
+  "dev_se": "(n_obs - n_esp)/sqrt(N p (1-p)) por ventana",
+  "sim_exp_highest_model": "prediccion exacta a tasa finita de sim_exp (recorte por ranura + gana el haz de k mas alto)"
+ },
+ "sim_exp_call": {
+  "key": "p_minflux",
+  "psf": "pila sintetica (4,1,1) = lam",
+  "r0": [
+   0,
+   0
+  ],
+  "SBR": 10.0,
+  "Ns": 2000,
+  "Nb": 200,
+  "M_p": 2200000,
+  "Tlife": 4.21,
+  "factor": 1.05,
+  "dt": 50.0,
+  "nMINFLUX_tau": [
+   0.0,
+   12.5,
+   25.0,
+   37.5
+  ],
+  "a": 0.0,
+  "b": 10.1
+ },
+ "lam": [
+  0.12,
+  0.28,
+  0.35,
+  0.25
+ ],
+ "C_irf_300ps_fwhm": [
+  [
+   0.8973135071151698,
+   0.00012315172816412812,
+   0.0023983548391824927,
+   0.04670747232204442
+  ],
+  [
+   0.04670747232204442,
+   0.8973135071151698,
+   0.00012315172816412812,
+   0.0023983548391824927
+  ],
+  [
+   0.0023983548391824927,
+   0.04670747232204442,
+   0.8973135071151698,
+   0.00012315172816412812
+  ],
+  [
+   0.00012315172816412812,
+   0.0023983548391824927,
+   0.04670747232204442,
+   0.8973135071151698
+  ]
+ ],
+ "C_column_sums": [
+  0.958408577732559,
+  0.958408577732559,
+  0.958408577732559,
+  0.958408577732559
+ ],
+ "counts_observed": [
+  566949.0,
+  1122512.0,
+  1407064.0,
+  1059923.0
+ ],
+ "frac_observed": [
+  0.13640228387315323,
+  0.270065209525056,
+  0.3385255872321752,
+  0.2550069193696156
+ ],
+ "frac_observed_se": [
+  0.00016834700244122691,
+  0.00021777858741951704,
+  0.00023210852887826076,
+  0.000213791742091521
+ ],
+ "frac_mixing": [
+  0.13649741606611088,
+  0.27041859745582725,
+  0.3385377148372832,
+  0.2545462716407787
+ ],
+ "frac_naive": [
+  0.1318181818181818,
+  0.2772727272727273,
+  0.3409090909090909,
+  0.25
+ ],
+ "frac_sim_exp_highest_model": [
+  0.13645741619523924,
+  0.27036044769455,
+  0.33855663119875734,
+  0.2546255049114534
+ ],
+ "dev_se_mixing": [
+  -0.5649300129530848,
+  -1.6220257082738925,
+  -0.05224926077706902,
+  2.1559386302919625
+ ],
+ "dev_se_naive": [
+  27.626282704274818,
+  -32.82510299109406,
+  -10.251444150400433,
+  23.573883741810004
+ ],
+ "chi2_mixing": 5.661816131055064,
+ "chi2_naive": 1927.397112913555,
+ "chi2_pvalue_sim_exp_highest_model": 0.2816597261530948,
+ "window0_contamination": {
+  "desc": "fraccion de los fotones de la ventana 0 que no vienen del haz 0 (fuga de otros haces + fondo), segun el modelo de mezcla",
+  "leak_from_other_beams": 0.08843914524597651,
+  "background": 0.14240466501139173,
+  "observed_frac_w0_minus_naive_in_se": 27.626282704274818
+ },
+ "variant_Nb0": {
+  "Nb": 0,
+  "n_detected_total": 2069876,
+  "counts_observed": [
+   261337.0,
+   563303.0,
+   716023.0,
+   529213.0
+  ],
+  "frac_observed": [
+   0.1262573216946329,
+   0.27214335544737944,
+   0.34592555302829736,
+   0.25567376982969026
+  ],
+  "frac_mixing": [
+   0.12692841909035824,
+   0.2721400163921373,
+   0.34600201297177746,
+   0.25492955154572694
+  ],
+  "chi2_pvalue_mixing": 0.007818483386879195,
+  "dev_se_mixing": [
+   -2.9003696810803357,
+   0.010793831738120655,
+   -0.23124833720380386,
+   2.4567656985578457
+  ],
+  "chi2_pvalue_naive": 0.0,
+  "dev_se_naive": [
+   27.703120330467094,
+   -25.174682732272665,
+   -12.289950505636495,
+   18.851384087807475
+  ],
+  "n_calls_ok": 1080,
+  "n_calls_failed": 0,
+  "per_call_chi2_mean": 3.0555034319783685,
+  "runtime_s": 130.03635573387146,
+  "seed_base": 20360928
+ },
+ "n_calls_ok": 2000,
+ "n_calls_failed": 0,
+ "per_call_chi2_mean_vs_mixing": 2.967289150478573,
+ "per_call_chi2_var_vs_mixing": 6.308990769568043,
+ "per_call_pvalue_ks_uniform": 0.103622571216895,
+ "seed_base": 20260928,
+ "calls_per_chunk": 20,
+ "runtime_s": 345.96954798698425,
+ "script": "scripts/validate_mixing_matrix.py"
+}

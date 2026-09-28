@@ -1,0 +1,1525 @@
+{
+ "audit": "A - tools/tools_simulations.py",
+ "worker": "W2",
+ "round": 1,
+ "criterion": "CONCEPTUAL = el modelo fisico o estadistico esta mal (el resultado es incorrecto aunque el codigo haga lo que pretende); IMPLEMENTACION = el codigo no hace lo que dice o pretende (bug); DISENO = decision defendible que limita el alcance o la validez. 'Latente' = no afecta a ningun numero publicado por la autora con su configuracion actual.",
+ "findings": [
+  {
+   "id": "F101",
+   "script": "scripts/findings/F101_tmicro_overwrite.py",
+   "title": "sim_exp: en un ciclo con fotones de >=2 haces sobrevive el de indice k MAS ALTO (TCSPC real: el mas temprano)",
+   "class": "IMPLEMENTACION",
+   "legacy_location": "legacy/p-minflux-main/tools/tools_simulations.py:511-531 (bucle Tmicro[m1] = k1*Texp + Exp); recorte por ranura l.464",
+   "authorship": "Masullo (nucleo original; la ruta rapida de la autora conserva el mismo comportamiento)",
+   "scenario": "lambda=[0.12,0.28,0.35,0.25], Tlife=0.001, Nb=0, a=0, b=dt/K; tasa 0.5 fotones/ciclo, 60000 fotones",
+   "impact": "Mecanismo confirmado: las fracciones de sim_exp coinciden con 'gana el k mas alto' (|z|<=1.1) y se apartan de p hasta 25 SE (ventana 3: 0.297 vs 0.25). A la tasa de los estudios (0.0105/ciclo) el 0.38 % de los ciclos ocupados tiene >=2 haces y el sesgo relativo maximo previsto es 0.46 % (haz 0). Impacto cuantitativo y barrido de tasa: ver W1 (results/mixing_rate_sweep.json).",
+   "fix": "Por ciclo, quedarse con el fotón de microtiempo MINIMO (primer foton) y aplicar tiempo muerto; o simular a tasa baja y declararlo.",
+   "what_was_right": "El recorte a 1 foton por ranura y el reparto multinomial+ciclos uniformes son correctos (F152a).",
+   "overlaps": "W1 cuantifica el impacto (tarea 1c).",
+   "status": "candidate",
+   "evidence_numbers": {
+    "p_true": [
+     0.12,
+     0.28,
+     0.35,
+     0.25
+    ],
+    "high_rate": {
+     "mu_photons_per_cycle": 0.5,
+     "n_counted": 60000,
+     "f_observed": [
+      0.09645,
+      0.24778333333333333,
+      0.3591666666666667,
+      0.2966
+     ],
+     "se": [
+      0.0012051790842028415,
+      0.0017625112437256276,
+      0.0019585963180392832,
+      0.0018647092713521502
+     ],
+     "pred_highest_k_wins": [
+      0.09532067058418317,
+      0.24597037097704447,
+      0.3600755316777768,
+      0.2986334267609957
+     ],
+     "pred_earliest_wins_TCSPC": [
+      0.14800509328940234,
+      0.31268962510880843,
+      0.33405772910034787,
+      0.20524755250144133
+     ],
+     "z_vs_highest_k": [
+      0.9370635705678646,
+      1.0286245621086585,
+      -0.4640389664471251,
+      -1.0904792464088646
+     ],
+     "z_vs_true_p": [
+      -19.540664378171652,
+      -18.278843202478832,
+      4.680222556449663,
+      24.990490858775576
+     ]
+    },
+    "study_rate": {
+     "mu_photons_per_cycle": 0.0105,
+     "frac_occupied_cycles_with_ge2_beams": 0.0037885026231991507,
+     "pred_highest_k_wins": [
+      0.11944633788809567,
+      0.27929410588880393,
+      0.35027432159318245,
+      0.25098523462991795
+     ],
+     "pred_earliest_wins_TCSPC": [
+      0.12055513681234034,
+      0.28070530140797445,
+      0.34972307375829653,
+      0.24901648802138887
+     ],
+     "max_abs_diff_highest_vs_true_p": 0.0009852346299179526,
+     "max_rel_diff_highest_vs_true_p": 0.004613850932536079
+    }
+   }
+  },
+  {
+   "id": "F102",
+   "script": "scripts/findings/F102_zeros_in_window0.py",
+   "title": "Los ceros de los ciclos vacios en relTime se cuentan en la ventana 0 si la ventana abre antes del pulso (a<0)",
+   "class": "IMPLEMENTACION",
+   "legacy_location": "legacy/p-minflux-main/tools/tools_simulations.py:517 (Tmicro=np.zeros(M_p)), :569 (concatenate), :994-996 (relTime>ti estricto)",
+   "authorship": "Masullo (original)",
+   "scenario": "TCP beams(K=4,L=100), fwhm 360, emisor (5,-5), Ns=2000, Nb=95, M_p=2e5, Tlife=0.001, dt=50, b=12.5; a=0 vs a=-0.25 ns; 20 repeticiones",
+   "impact": "relTime tiene 200095 elementos, 198000 de ellos 0.0 exacto. Con a=0 la ventana 0 cuenta 37 fotones y el MLE da error medio 1.28 nm; con a=-0.25 ns la ventana 0 cuenta 198037, el MLE termina en el borde de busqueda en el 100 % de los casos, estimacion media (74.4,-4.2) nm, error medio 69.9 nm. Latente: todos los estudios usan a=0 y funcionan solo por la desigualdad estricta.",
+   "fix": "Devolver solo los microtiempos de fotones detectados (sin ceros) o una mascara; validar a,b en nMINFLUX.",
+   "what_was_right": "Con a=0 y la desigualdad estricta el conteo es correcto (los ceros quedan fuera).",
+   "overlaps": "Sospecha (i) del plan del PI.",
+   "status": "candidate",
+   "evidence_numbers": {
+    "n_exact_zeros_in_relTime_mean": 198000.0,
+    "len_relTime": 200095,
+    "a0": {
+     "a_ns": 0.0,
+     "mean_counts": [
+      37.2,
+      858.35,
+      646.35,
+      553.1
+     ],
+     "mean_estimate_nm": [
+      5.25,
+      -4.95
+     ],
+     "mean_error_nm": 1.2771601883432526,
+     "frac_estimates_on_search_boundary": 0.0
+    },
+    "a_neg": {
+     "a_ns": -0.25,
+     "mean_counts": [
+      198036.7,
+      858.2,
+      646.55,
+      552.95
+     ],
+     "mean_estimate_nm": [
+      74.4,
+      -4.2
+     ],
+     "mean_error_nm": 69.91946746990843,
+     "frac_estimates_on_search_boundary": 1.0
+    }
+   }
+  },
+  {
+   "id": "F103",
+   "script": "scripts/findings/F103_windows_not_periodic.py",
+   "title": "nMINFLUX no pliega las ventanas modulo el periodo ni controla solapamiento",
+   "class": "IMPLEMENTACION",
+   "legacy_location": "legacy/p-minflux-main/tools/tools_simulations.py:993-997",
+   "authorship": "Masullo (original)",
+   "scenario": "S1: ceros filtrados, a=-0.5, b=12.5, Tlife=4.21 y 0.001, TCP, emisor (5,-5), SBR 21; S2: b=13 > dt/K",
+   "impact": "S1: la ventana 0 pierde [49.5,50): -5.9 % de sus cuentas con Tlife=4.21 (-2.8 % con 0.001); fondo 0.24 vs 0.25 del ciclo; sesgo asintotico extra del MLE 0.34 nm (Tlife=4.21) y 0.06 nm (0.001). S2: fotones contados dos veces: 11.2 % (Tlife=4.21) y 94.9 % (Tlife=0.001), sin aviso. Latente (estudios: a=0, b=dt/K).",
+   "fix": "Ventana i = {t : (t - tau_i - a) mod T in [0, b)}; error si b > T/K.",
+   "what_was_right": "Con a=0 y b<=dt/K (lo que usan todos los estudios) las ventanas son correctas.",
+   "overlaps": "Sospecha (ii).",
+   "status": "candidate",
+   "evidence_numbers": {
+    "S1_a-0.5_b12.5_Tlife4.21": {
+     "mc_counts_nMINFLUX_per_call": [
+      64.33333333333333,
+      810.8666666666667,
+      648.1666666666666,
+      567.5666666666667
+     ],
+     "mc_counts_periodic_per_call": [
+      68.4,
+      810.8666666666667,
+      648.1666666666666,
+      567.5666666666667
+     ],
+     "mc_lost_from_window0_pct": 5.94541910331384,
+     "E_counts_legacy": [
+      63.452521914273945,
+      807.1267552079362,
+      651.8366646840462,
+      567.9235288191354
+     ],
+     "E_counts_periodic": [
+      68.11305128888249,
+      807.1267552079362,
+      651.8366646840462,
+      567.9235288191354
+     ],
+     "bkg_share_window0_legacy_vs_others": [
+      0.24,
+      0.25
+     ],
+     "asympt_estimate_legacy_windows_nm": [
+      5.8027674072455415,
+      -5.353479732766102
+     ],
+     "asympt_estimate_periodic_windows_nm": [
+      6.0032503110124456,
+      -5.625738294182636
+     ],
+     "extra_bias_from_no_wrap_nm": 0.3381096256651237
+    },
+    "S1_a-0.5_b12.5_Tlife0.001": {
+     "mc_counts_nMINFLUX_per_call": [
+      35.96666666666667,
+      847.4,
+      647.7333333333333,
+      562.8666666666667
+     ],
+     "mc_counts_periodic_per_call": [
+      37.0,
+      847.4,
+      647.7333333333333,
+      562.8666666666667
+     ],
+     "mc_lost_from_window0_pct": 2.7927927927927927,
+     "E_counts_legacy": [
+      36.523361465830035,
+      852.6924518799749,
+      641.9929640276783,
+      562.8412226265169
+     ],
+     "E_counts_periodic": [
+      37.47336146583004,
+      852.6924518799749,
+      641.9929640276783,
+      562.8412226265169
+     ],
+     "bkg_share_window0_legacy_vs_others": [
+      0.24,
+      0.25
+     ],
+     "asympt_estimate_legacy_windows_nm": [
+      4.959807334091316,
+      -4.951073822312177
+     ],
+     "asympt_estimate_periodic_windows_nm": [
+      5.0,
+      -5.0
+     ],
+     "extra_bias_from_no_wrap_nm": 0.06331841166665153
+    },
+    "S2_a0_b13_Tlife4.21": {
+     "sum_counts_over_windows": 2330.2,
+     "photons_in_cycle": 2095.0,
+     "double_counted_pct": 11.22673031026253
+    },
+    "S2_a0_b13_Tlife0.001": {
+     "sum_counts_over_windows": 4083.5,
+     "photons_in_cycle": 2095.0,
+     "double_counted_pct": 94.9164677804296
+    }
+   }
+  },
+  {
+   "id": "F104",
+   "script": "scripts/findings/F104_naive_model_windows_leakage.py",
+   "title": "pos_MINFLUX/crb_minflux (Ec. 3.5, fondo 1/K, sin fuga) no describen ventanas b<T/K ni la fuga entre pulsos",
+   "class": "CONCEPTUAL",
+   "legacy_location": "legacy/p-minflux-main/tools/tools_simulations.py:1041 (p de pos_MINFLUX), :649-661 (crb_minflux), comentario :423-435 ('EXACTAMENTE')",
+   "authorship": "Modelo Ec. 3.5: Masullo (tesis y codigo). El comentario que lo declara exacto y su verificacion: la autora.",
+   "scenario": "TCP beams(K=4,L=100), fwhm 360; setup medido tau=4.21 ns, ventana [0,10.1] ns, dt=50; SBR 21 (2000/95) y 6 (2000/333); 5 posiciones; sesgo asintotico (sin ruido) del MLE con el modelo de pos_MINFLUX sobre E[n] exacto de sim_exp+nMINFLUX (verificado por MC: chi2 p=0.38 modelo de mezcla, chi2=2559 modelo ingenuo)",
+   "impact": "Configuracion de los estudios (Tlife=0.001, b=12.5): sesgo 0.000 nm, el comentario es correcto ahi. Setup medido, SBR 21: sesgo 0.85 (5,-5), 1.51 (-5.07,-7.56), 1.63 (20,0), 2.69 (-15,15), 2.36 (0,-30) nm, frente a CRB 0.82-1.22 nm (sesgo 1.0-2.7 CRB); la ventana 0 en (5,-5) tiene 46 % de fotones de otros haces; el CRB real es 8.6-13.5 % mayor que el que da crb_minflux. SBR 6: sesgo 0.59-2.32 nm. Solo b=10.1 sin fuga: 0.01-0.48 nm (SBR en ventanas 26.1 vs 21.05 nominal).",
+   "fix": "p_i' = (Ns sum_j C_ij q_j + Nb b/T) / total, con la matriz de mezcla periodica C y el fondo por ancho de ventana; CRB con ese p' y N en ventanas.",
+   "what_was_right": "La autora verifico que el fondo uniforme reproduce Ec. 3.5 con b=dt/K; F104 lo confirma (sesgo 0, chi2 p=0.31).",
+   "overlaps": "W1 valida C contra sim_exp; W3 cuantifica el impacto en los estudios (Tlife=0.001). Aqui: sesgo del estimador del nucleo.",
+   "status": "candidate",
+   "evidence_numbers": {
+    "C_measured_setup": [
+     [
+      0.9092021336729775,
+      0.0001230953547981681,
+      0.0023972569793580794,
+      0.04668609172542506
+     ],
+     [
+      0.04668609172542506,
+      0.9092021336729775,
+      0.0001230953547981681,
+      0.0023972569793580794
+     ],
+     [
+      0.0023972569793580794,
+      0.04668609172542506,
+      0.9092021336729775,
+      0.0001230953547981681
+     ],
+     [
+      0.0001230953547981681,
+      0.0023972569793580794,
+      0.04668609172542506,
+      0.9092021336729775
+     ]
+    ],
+    "bias": {
+     "SBR21_Ns2000_Nb95 | study_Tlife0.001_a0_b12.5 | (5,-5)": {
+      "bias_vec_nm": [
+       0.0,
+       0.0
+      ],
+      "bias_nm": 0.0,
+      "N_in_windows": 2095.0,
+      "SBR_nominal": 21.05263157894737,
+      "SBR_in_windows": 21.05263157894737,
+      "window0_contamination_from_other_beams_pct": 0.0,
+      "crb_minflux_assumed_nm": 0.8156931477641058,
+      "crb_true_model_nm": 0.8156931477641938,
+      "crb_ratio_true_over_assumed": 1.0000000000001077
+     },
+     "SBR21_Ns2000_Nb95 | study_Tlife0.001_a0_b12.5 | (-5.07,-7.56)": {
+      "bias_vec_nm": [
+       0.0,
+       0.0
+      ],
+      "bias_nm": 0.0,
+      "N_in_windows": 2095.0,
+      "SBR_nominal": 21.05263157894737,
+      "SBR_in_windows": 21.05263157894737,
+      "window0_contamination_from_other_beams_pct": 0.0,
+      "crb_minflux_assumed_nm": 0.8486945520038733,
+      "crb_true_model_nm": 0.8486945520036252,
+      "crb_ratio_true_over_assumed": 0.9999999999997077
+     },
+     "SBR21_Ns2000_Nb95 | study_Tlife0.001_a0_b12.5 | (20,0)": {
+      "bias_vec_nm": [
+       0.0,
+       0.0
+      ],
+      "bias_nm": 0.0,
+      "N_in_windows": 2095.0,
+      "SBR_nominal": 21.05263157894737,
+      "SBR_in_windows": 21.05263157894737,
+      "window0_contamination_from_other_beams_pct": 0.0,
+      "crb_minflux_assumed_nm": 1.0041494980886407,
+      "crb_true_model_nm": 1.0041494980875036,
+      "crb_ratio_true_over_assumed": 0.9999999999988676
+     },
+     "SBR21_Ns2000_Nb95 | study_Tlife0.001_a0_b12.5 | (-15,15)": {
+      "bias_vec_nm": [
+       0.0,
+       0.0
+      ],
+      "bias_nm": 0.0,
+      "N_in_windows": 2095.0,
+      "SBR_nominal": 21.05263157894737,
+      "SBR_in_windows": 21.05263157894737,
+      "window0_contamination_from_other_beams_pct": 0.0,
+      "crb_minflux_assumed_nm": 1.0103658036176741,
+      "crb_true_model_nm": 1.0103658036188807,
+      "crb_ratio_true_over_assumed": 1.0000000000011942
+     },
+     "SBR21_Ns2000_Nb95 | study_Tlife0.001_a0_b12.5 | (0,-30)": {
+      "bias_vec_nm": [
+       -5.414565444583631e-07,
+       8.261230632911065e-08
+      ],
+      "bias_nm": 5.477225417068446e-07,
+      "N_in_windows": 2095.0,
+      "SBR_nominal": 21.05263157894737,
+      "SBR_in_windows": 21.05263157894737,
+      "window0_contamination_from_other_beams_pct": 0.0,
+      "crb_minflux_assumed_nm": 1.2220059053102148,
+      "crb_true_model_nm": 1.2220059053101036,
+      "crb_ratio_true_over_assumed": 0.999999999999909
+     },
+     "SBR21_Ns2000_Nb95 | window10.1_only_Tlife0.001 | (5,-5)": {
+      "bias_vec_nm": [
+       -0.15662320237261174,
+       0.19578947966121873
+      ],
+      "bias_nm": 0.2507276368242298,
+      "N_in_windows": 2076.76,
+      "SBR_nominal": 21.05263157894737,
+      "SBR_in_windows": 26.05523710265763,
+      "window0_contamination_from_other_beams_pct": 0.0,
+      "crb_minflux_assumed_nm": 0.8156931477641058,
+      "crb_true_model_nm": 0.8063368487879459,
+      "crb_ratio_true_over_assumed": 0.9885296339661471
+     },
+     "SBR21_Ns2000_Nb95 | window10.1_only_Tlife0.001 | (-5.07,-7.56)": {
+      "bias_vec_nm": [
+       0.1052384428718165,
+       0.13722934640275408
+      ],
+      "bias_nm": 0.17293647207056023,
+      "N_in_windows": 2076.76,
+      "SBR_nominal": 21.05263157894737,
+      "SBR_in_windows": 26.05523710265763,
+      "window0_contamination_from_other_beams_pct": 0.0,
+      "crb_minflux_assumed_nm": 0.8486945520038733,
+      "crb_true_model_nm": 0.8422462116447067,
+      "crb_ratio_true_over_assumed": 0.9924020481291634
+     },
+     "SBR21_Ns2000_Nb95 | window10.1_only_Tlife0.001 | (20,0)": {
+      "bias_vec_nm": [
+       -0.01058530736298735,
+       9.808171139269559e-08
+      ],
+      "bias_nm": 0.010585307363441755,
+      "N_in_windows": 2076.76,
+      "SBR_nominal": 21.05263157894737,
+      "SBR_in_windows": 26.05523710265763,
+      "window0_contamination_from_other_beams_pct": 0.0,
+      "crb_minflux_assumed_nm": 1.0041494980886407,
+      "crb_true_model_nm": 0.9988016572092312,
+      "crb_ratio_true_over_assumed": 0.9946742582756961
+     },
+     "SBR21_Ns2000_Nb95 | window10.1_only_Tlife0.001 | (-15,15)": {
+      "bias_vec_nm": [
+       0.08507172900219118,
+       0.044774899970832394
+      ],
+      "bias_nm": 0.09613527314581419,
+      "N_in_windows": 2076.76,
+      "SBR_nominal": 21.05263157894737,
+      "SBR_in_windows": 26.05523710265763,
+      "window0_contamination_from_other_beams_pct": 0.0,
+      "crb_minflux_assumed_nm": 1.0103658036176741,
+      "crb_true_model_nm": 1.0040022097816366,
+      "crb_ratio_true_over_assumed": 0.9937016931756277
+     },
+     "SBR21_Ns2000_Nb95 | window10.1_only_Tlife0.001 | (0,-30)": {
+      "bias_vec_nm": [
+       -0.17240353056285804,
+       0.051507010495033256
+      ],
+      "bias_nm": 0.17993318059955976,
+      "N_in_windows": 2076.76,
+      "SBR_nominal": 21.05263157894737,
+      "SBR_in_windows": 26.05523710265763,
+      "window0_contamination_from_other_beams_pct": 0.0,
+      "crb_minflux_assumed_nm": 1.2220059053102148,
+      "crb_true_model_nm": 1.2117356400804462,
+      "crb_ratio_true_over_assumed": 0.9915955682495975
+     },
+     "SBR21_Ns2000_Nb95 | leak_only_Tlife4.21_b12.5 | (5,-5)": {
+      "bias_vec_nm": [
+       0.8869241711596754,
+       -0.5532735387706245
+      ],
+      "bias_nm": 1.0453449641582662,
+      "N_in_windows": 2095.0,
+      "SBR_nominal": 21.05263157894737,
+      "SBR_in_windows": 21.05263157894737,
+      "window0_contamination_from_other_beams_pct": 43.154467037405006,
+      "crb_minflux_assumed_nm": 0.8156931477641058,
+      "crb_true_model_nm": 0.9101523489413468,
+      "crb_ratio_true_over_assumed": 1.1158023718063133
+     },
+     "SBR21_Ns2000_Nb95 | leak_only_Tlife4.21_b12.5 | (-5.07,-7.56)": {
+      "bias_vec_nm": [
+       -1.5844999236729587,
+       -0.4245860148170584
+      ],
+      "bias_nm": 1.6404003450675821,
+      "N_in_windows": 2095.0,
+      "SBR_nominal": 21.05263157894737,
+      "SBR_in_windows": 21.052631578947366,
+      "window0_contamination_from_other_beams_pct": 46.63950457533695,
+      "crb_minflux_assumed_nm": 0.8486945520038733,
+      "crb_true_model_nm": 0.9063377371827376,
+      "crb_ratio_true_over_assumed": 1.0679198246798705
+     },
+     "SBR21_Ns2000_Nb95 | leak_only_Tlife4.21_b12.5 | (20,0)": {
+      "bias_vec_nm": [
+       -1.1058205628019664,
+       1.1931237212525418
+      ],
+      "bias_nm": 1.626770829382913,
+      "N_in_windows": 2095.0,
+      "SBR_nominal": 21.05263157894737,
+      "SBR_in_windows": 21.05263157894737,
+      "window0_contamination_from_other_beams_pct": 9.911630750807488,
+      "crb_minflux_assumed_nm": 1.0041494980886407,
+      "crb_true_model_nm": 1.0987055418840568,
+      "crb_ratio_true_over_assumed": 1.0941653050421274
+     },
+     "SBR21_Ns2000_Nb95 | leak_only_Tlife4.21_b12.5 | (-15,15)": {
+      "bias_vec_nm": [
+       -2.7713019688721623,
+       0.24191336748240033
+      ],
+      "bias_nm": 2.781840520238606,
+      "N_in_windows": 2095.0000000000005,
+      "SBR_nominal": 21.05263157894737,
+      "SBR_in_windows": 21.052631578947373,
+      "window0_contamination_from_other_beams_pct": 28.10614236745598,
+      "crb_minflux_assumed_nm": 1.0103658036176741,
+      "crb_true_model_nm": 1.0794270309940768,
+      "crb_ratio_true_over_assumed": 1.0683526967452035
+     },
+     "SBR21_Ns2000_Nb95 | leak_only_Tlife4.21_b12.5 | (0,-30)": {
+      "bias_vec_nm": [
+       2.4970135100986024,
+       0.07549226620038141
+      ],
+      "bias_nm": 2.4981544291478484,
+      "N_in_windows": 2095.0,
+      "SBR_nominal": 21.05263157894737,
+      "SBR_in_windows": 21.05263157894737,
+      "window0_contamination_from_other_beams_pct": 14.059548849166735,
+      "crb_minflux_assumed_nm": 1.2220059053102148,
+      "crb_true_model_nm": 1.3659183098635341,
+      "crb_ratio_true_over_assumed": 1.1177673560560955
+     },
+     "SBR21_Ns2000_Nb95 | measured_setup_Tlife4.21_b10.1 | (5,-5)": {
+      "bias_vec_nm": [
+       0.7610161387039636,
+       -0.3740417672652425
+      ],
+      "bias_nm": 0.8479698149266849,
+      "N_in_windows": 1993.577155465118,
+      "SBR_nominal": 21.05263157894737,
+      "SBR_in_windows": 24.9715627340427,
+      "window0_contamination_from_other_beams_pct": 45.793252938710864,
+      "crb_minflux_assumed_nm": 0.8156931477641058,
+      "crb_true_model_nm": 0.9255190288534145,
+      "crb_ratio_true_over_assumed": 1.1346411716101235
+     },
+     "SBR21_Ns2000_Nb95 | measured_setup_Tlife4.21_b10.1 | (-5.07,-7.56)": {
+      "bias_vec_nm": [
+       -1.4678123729654367,
+       -0.3555795347985624
+      ],
+      "bias_nm": 1.5102681774433269,
+      "N_in_windows": 1993.5771554651178,
+      "SBR_nominal": 21.05263157894737,
+      "SBR_in_windows": 24.9715627340427,
+      "window0_contamination_from_other_beams_pct": 48.79689867333147,
+      "crb_minflux_assumed_nm": 0.8486945520038733,
+      "crb_true_model_nm": 0.921695613339568,
+      "crb_ratio_true_over_assumed": 1.08601570631428
+     },
+     "SBR21_Ns2000_Nb95 | measured_setup_Tlife4.21_b10.1 | (20,0)": {
+      "bias_vec_nm": [
+       -1.1277542408781116,
+       1.1703633845334465
+      ],
+      "bias_nm": 1.6252938441017826,
+      "N_in_windows": 1993.5771554651178,
+      "SBR_nominal": 21.05263157894737,
+      "SBR_in_windows": 24.971562734042696,
+      "window0_contamination_from_other_beams_pct": 10.215881458265113,
+      "crb_minflux_assumed_nm": 1.0041494980886407,
+      "crb_true_model_nm": 1.1174793746761535,
+      "crb_ratio_true_over_assumed": 1.1128615577692682
+     },
+     "SBR21_Ns2000_Nb95 | measured_setup_Tlife4.21_b10.1 | (-15,15)": {
+      "bias_vec_nm": [
+       -2.675488091969168,
+       0.3110162393104865
+      ],
+      "bias_nm": 2.69350471159485,
+      "N_in_windows": 1993.5771554651178,
+      "SBR_nominal": 21.05263157894737,
+      "SBR_in_windows": 24.9715627340427,
+      "window0_contamination_from_other_beams_pct": 28.7382606657439,
+      "crb_minflux_assumed_nm": 1.0103658036176741,
+      "crb_true_model_nm": 1.0971968816480933,
+      "crb_ratio_true_over_assumed": 1.0859402383963466
+     },
+     "SBR21_Ns2000_Nb95 | measured_setup_Tlife4.21_b10.1 | (0,-30)": {
+      "bias_vec_nm": [
+       2.359249243346347,
+       0.1466989547629467
+      ],
+      "bias_nm": 2.3638057398100316,
+      "N_in_windows": 1993.577155465118,
+      "SBR_nominal": 21.05263157894737,
+      "SBR_in_windows": 24.9715627340427,
+      "window0_contamination_from_other_beams_pct": 14.301345075289515,
+      "crb_minflux_assumed_nm": 1.2220059053102148,
+      "crb_true_model_nm": 1.3868968594697293,
+      "crb_ratio_true_over_assumed": 1.134934662298261
+     },
+     "SBR6_Ns2000_Nb333 | study_Tlife0.001_a0_b12.5 | (5,-5)": {
+      "bias_vec_nm": [
+       4.630156791307627e-08,
+       4.0632011888419584e-07
+      ],
+      "bias_nm": 4.089497208719872e-07,
+      "N_in_windows": 2333.0,
+      "SBR_nominal": 6.006006006006006,
+      "SBR_in_windows": 6.006006006006006,
+      "window0_contamination_from_other_beams_pct": 0.0,
+      "crb_minflux_assumed_nm": 0.8874579768428194,
+      "crb_true_model_nm": 0.8874579768423638,
+      "crb_ratio_true_over_assumed": 0.9999999999994867
+     },
+     "SBR6_Ns2000_Nb333 | study_Tlife0.001_a0_b12.5 | (-5.07,-7.56)": {
+      "bias_vec_nm": [
+       -6.215994741154418e-08,
+       1.092223618215371e-07
+      ],
+      "bias_nm": 1.256717286587588e-07,
+      "N_in_windows": 2333.0,
+      "SBR_nominal": 6.006006006006006,
+      "SBR_in_windows": 6.006006006006006,
+      "window0_contamination_from_other_beams_pct": 0.0,
+      "crb_minflux_assumed_nm": 0.9086145280370062,
+      "crb_true_model_nm": 0.9086145280348659,
+      "crb_ratio_true_over_assumed": 0.9999999999976444
+     },
+     "SBR6_Ns2000_Nb333 | study_Tlife0.001_a0_b12.5 | (20,0)": {
+      "bias_vec_nm": [
+       -1.0409654294107895e-07,
+       1.7828021638699455e-07
+      ],
+      "bias_nm": 2.064459391881504e-07,
+      "N_in_windows": 2333.0,
+      "SBR_nominal": 6.006006006006006,
+      "SBR_in_windows": 6.006006006006006,
+      "window0_contamination_from_other_beams_pct": 0.0,
+      "crb_minflux_assumed_nm": 1.069989051895621,
+      "crb_true_model_nm": 1.0699890518968118,
+      "crb_ratio_true_over_assumed": 1.0000000000011129
+     },
+     "SBR6_Ns2000_Nb333 | study_Tlife0.001_a0_b12.5 | (-15,15)": {
+      "bias_vec_nm": [
+       0.0,
+       0.0
+      ],
+      "bias_nm": 0.0,
+      "N_in_windows": 2333.0,
+      "SBR_nominal": 6.006006006006006,
+      "SBR_in_windows": 6.006006006006006,
+      "window0_contamination_from_other_beams_pct": 0.0,
+      "crb_minflux_assumed_nm": 1.0866741450558646,
+      "crb_true_model_nm": 1.08667414505599,
+      "crb_ratio_true_over_assumed": 1.0000000000001155
+     },
+     "SBR6_Ns2000_Nb333 | study_Tlife0.001_a0_b12.5 | (0,-30)": {
+      "bias_vec_nm": [
+       1.5855317526103361e-07,
+       5.574642614192271e-08
+      ],
+      "bias_nm": 1.6806776434805363e-07,
+      "N_in_windows": 2333.0,
+      "SBR_nominal": 6.006006006006006,
+      "SBR_in_windows": 6.006006006006006,
+      "window0_contamination_from_other_beams_pct": 0.0,
+      "crb_minflux_assumed_nm": 1.3460868328964968,
+      "crb_true_model_nm": 1.3460868328968532,
+      "crb_ratio_true_over_assumed": 1.0000000000002647
+     },
+     "SBR6_Ns2000_Nb333 | window10.1_only_Tlife0.001 | (5,-5)": {
+      "bias_vec_nm": [
+       -0.1898834337174078,
+       0.24557036568128243
+      ],
+      "bias_nm": 0.3104199138282723,
+      "N_in_windows": 2269.0640000000003,
+      "SBR_nominal": 6.006006006006006,
+      "SBR_in_windows": 7.433175750007434,
+      "window0_contamination_from_other_beams_pct": 0.0,
+      "crb_minflux_assumed_nm": 0.8874579768428194,
+      "crb_true_model_nm": 0.8725894066189406,
+      "crb_ratio_true_over_assumed": 0.9832458881300785
+     },
+     "SBR6_Ns2000_Nb333 | window10.1_only_Tlife0.001 | (-5.07,-7.56)": {
+      "bias_vec_nm": [
+       0.13554221082834506,
+       0.17114236735267507
+      ],
+      "bias_nm": 0.21831491204064263,
+      "N_in_windows": 2269.064,
+      "SBR_nominal": 6.006006006006006,
+      "SBR_in_windows": 7.433175750007434,
+      "window0_contamination_from_other_beams_pct": 0.0,
+      "crb_minflux_assumed_nm": 0.9086145280370062,
+      "crb_true_model_nm": 0.8949252099416598,
+      "crb_ratio_true_over_assumed": 0.9849338551465592
+     },
+     "SBR6_Ns2000_Nb333 | window10.1_only_Tlife0.001 | (20,0)": {
+      "bias_vec_nm": [
+       0.048943183851449135,
+       -5.314300725611839e-07
+      ],
+      "bias_nm": 0.04894318385433429,
+      "N_in_windows": 2269.0640000000003,
+      "SBR_nominal": 6.006006006006006,
+      "SBR_in_windows": 7.433175750007434,
+      "window0_contamination_from_other_beams_pct": 0.0,
+      "crb_minflux_assumed_nm": 1.069989051895621,
+      "crb_true_model_nm": 1.052917200325237,
+      "crb_ratio_true_over_assumed": 0.9840448352811283
+     },
+     "SBR6_Ns2000_Nb333 | window10.1_only_Tlife0.001 | (-15,15)": {
+      "bias_vec_nm": [
+       0.1520773422172894,
+       0.1537774624067012
+      ],
+      "bias_nm": 0.2162753475551917,
+      "N_in_windows": 2269.0640000000003,
+      "SBR_nominal": 6.006006006006006,
+      "SBR_in_windows": 7.433175750007434,
+      "window0_contamination_from_other_beams_pct": 0.0,
+      "crb_minflux_assumed_nm": 1.0866741450558646,
+      "crb_true_model_nm": 1.0671874831440387,
+      "crb_ratio_true_over_assumed": 0.9820676124480499
+     },
+     "SBR6_Ns2000_Nb333 | window10.1_only_Tlife0.001 | (0,-30)": {
+      "bias_vec_nm": [
+       -0.4657478781828819,
+       0.10732003292653047
+      ],
+      "bias_nm": 0.47795258708286975,
+      "N_in_windows": 2269.0640000000003,
+      "SBR_nominal": 6.006006006006006,
+      "SBR_in_windows": 7.433175750007434,
+      "window0_contamination_from_other_beams_pct": 0.0,
+      "crb_minflux_assumed_nm": 1.3460868328964968,
+      "crb_true_model_nm": 1.3143400071526266,
+      "crb_ratio_true_over_assumed": 0.9764154696650901
+     },
+     "SBR6_Ns2000_Nb333 | leak_only_Tlife4.21_b12.5 | (5,-5)": {
+      "bias_vec_nm": [
+       0.1782230462229073,
+       0.36306040555190044
+      ],
+      "bias_nm": 0.4044456852093776,
+      "N_in_windows": 2333.0,
+      "SBR_nominal": 6.006006006006006,
+      "SBR_in_windows": 6.006006006006006,
+      "window0_contamination_from_other_beams_pct": 22.477617290188086,
+      "crb_minflux_assumed_nm": 0.8874579768428194,
+      "crb_true_model_nm": 0.963309216875257,
+      "crb_ratio_true_over_assumed": 1.0854702329706727
+     },
+     "SBR6_Ns2000_Nb333 | leak_only_Tlife4.21_b12.5 | (-5.07,-7.56)": {
+      "bias_vec_nm": [
+       -0.8308013927534876,
+       0.1581232422969201
+      ],
+      "bias_nm": 0.8457150311751739,
+      "N_in_windows": 2333.0,
+      "SBR_nominal": 6.006006006006006,
+      "SBR_in_windows": 6.006006006006006,
+      "window0_contamination_from_other_beams_pct": 27.34205650245381,
+      "crb_minflux_assumed_nm": 0.9086145280370062,
+      "crb_true_model_nm": 0.9615955829991744,
+      "crb_ratio_true_over_assumed": 1.058309715866672
+     },
+     "SBR6_Ns2000_Nb333 | leak_only_Tlife4.21_b12.5 | (20,0)": {
+      "bias_vec_nm": [
+       -1.246090145969287,
+       1.1499462709423955
+      ],
+      "bias_nm": 1.6956170198296785,
+      "N_in_windows": 2333.0,
+      "SBR_nominal": 6.006006006006006,
+      "SBR_in_windows": 6.006006006006006,
+      "window0_contamination_from_other_beams_pct": 6.717788221764515,
+      "crb_minflux_assumed_nm": 1.069989051895621,
+      "crb_true_model_nm": 1.169556715804211,
+      "crb_ratio_true_over_assumed": 1.0930548436287206
+     },
+     "SBR6_Ns2000_Nb333 | leak_only_Tlife4.21_b12.5 | (-15,15)": {
+      "bias_vec_nm": [
+       -2.456485635914987,
+       0.29026001437278204
+      ],
+      "bias_nm": 2.473574853405562,
+      "N_in_windows": 2333.0000000000005,
+      "SBR_nominal": 6.006006006006006,
+      "SBR_in_windows": 6.006006006006007,
+      "window0_contamination_from_other_beams_pct": 20.801935467880885,
+      "crb_minflux_assumed_nm": 1.0866741450558646,
+      "crb_true_model_nm": 1.158688942867391,
+      "crb_ratio_true_over_assumed": 1.06627083025687
+     },
+     "SBR6_Ns2000_Nb333 | leak_only_Tlife4.21_b12.5 | (0,-30)": {
+      "bias_vec_nm": [
+       2.261620542244386,
+       0.2629324710611556
+      ],
+      "bias_nm": 2.276853302573558,
+      "N_in_windows": 2333.0,
+      "SBR_nominal": 6.006006006006006,
+      "SBR_in_windows": 6.006006006006006,
+      "window0_contamination_from_other_beams_pct": 11.071376235585268,
+      "crb_minflux_assumed_nm": 1.3460868328964968,
+      "crb_true_model_nm": 1.4883672582775362,
+      "crb_ratio_true_over_assumed": 1.1056992921287863
+     },
+     "SBR6_Ns2000_Nb333 | measured_setup_Tlife4.21_b10.1 | (5,-5)": {
+      "bias_vec_nm": [
+       0.00381659628512665,
+       0.5851849586035938
+      ],
+      "bias_nm": 0.5851974044569007,
+      "N_in_windows": 2185.881155465118,
+      "SBR_nominal": 6.006006006006006,
+      "SBR_in_windows": 7.124019398600772,
+      "window0_contamination_from_other_beams_pct": 25.12048771178446,
+      "crb_minflux_assumed_nm": 0.8874579768428194,
+      "crb_true_model_nm": 0.9732673531490983,
+      "crb_ratio_true_over_assumed": 1.0966911995219768
+     },
+     "SBR6_Ns2000_Nb333 | measured_setup_Tlife4.21_b10.1 | (-5.07,-7.56)": {
+      "bias_vec_nm": [
+       -0.6736726086927645,
+       0.2796033466642287
+      ],
+      "bias_nm": 0.7293920860338089,
+      "N_in_windows": 2185.8811554651174,
+      "SBR_nominal": 6.006006006006006,
+      "SBR_in_windows": 7.124019398600771,
+      "window0_contamination_from_other_beams_pct": 30.07437797501364,
+      "crb_minflux_assumed_nm": 0.9086145280370062,
+      "crb_true_model_nm": 0.9708522673269644,
+      "crb_ratio_true_over_assumed": 1.0684974071726745
+     },
+     "SBR6_Ns2000_Nb333 | measured_setup_Tlife4.21_b10.1 | (20,0)": {
+      "bias_vec_nm": [
+       -1.2425003491865425,
+       1.1062976334117092
+      ],
+      "bias_nm": 1.6636410584681507,
+      "N_in_windows": 2185.8811554651174,
+      "SBR_nominal": 6.006006006006006,
+      "SBR_in_windows": 7.12401939860077,
+      "window0_contamination_from_other_beams_pct": 7.229297697358709,
+      "crb_minflux_assumed_nm": 1.069989051895621,
+      "crb_true_model_nm": 1.1793825469251757,
+      "crb_ratio_true_over_assumed": 1.1022379573283954
+     },
+     "SBR6_Ns2000_Nb333 | measured_setup_Tlife4.21_b10.1 | (-15,15)": {
+      "bias_vec_nm": [
+       -2.2713916020377134,
+       0.48492639240415514
+      ],
+      "bias_nm": 2.3225790440494287,
+      "N_in_windows": 2185.8811554651174,
+      "SBR_nominal": 6.006006006006006,
+      "SBR_in_windows": 7.124019398600772,
+      "window0_contamination_from_other_beams_pct": 22.06081006305108,
+      "crb_minflux_assumed_nm": 1.0866741450558646,
+      "crb_true_model_nm": 1.1665260590877262,
+      "crb_ratio_true_over_assumed": 1.0734828507654948
+     },
+     "SBR6_Ns2000_Nb333 | measured_setup_Tlife4.21_b10.1 | (0,-30)": {
+      "bias_vec_nm": [
+       1.8830931137266682,
+       0.4355304002074156
+      ],
+      "bias_nm": 1.9328027329424051,
+      "N_in_windows": 2185.881155465118,
+      "SBR_nominal": 6.006006006006006,
+      "SBR_in_windows": 7.124019398600772,
+      "window0_contamination_from_other_beams_pct": 11.613353581667285,
+      "crb_minflux_assumed_nm": 1.3460868328964968,
+      "crb_true_model_nm": 1.4940232290099462,
+      "crb_ratio_true_over_assumed": 1.1099010795574913
+     }
+    },
+    "mc_check_measured_setup_(5,-5)_SBR21": {
+     "n_counted": 299149,
+     "chi2_true_model": 3.051511653369557,
+     "p_true_model": 0.3837510799481222,
+     "chi2_naive_model": 2559.144288506394,
+     "p_naive_model": 0.0
+    },
+    "mc_check_study_config_(5,-5)_SBR21": {
+     "n_counted": 314250,
+     "chi2_true_model": 3.623980475515527,
+     "p_true_model": 0.3050346683015264,
+     "chi2_naive_model": 3.6239804755154585,
+     "p_naive_model": 0.30503466830153664
+    },
+    "grid_pos_MINFLUX_on_expected_counts_measured_setup_(5,-5)": [
+     6.0,
+     -5.0
+    ]
+   }
+  },
+  {
+   "id": "F106",
+   "script": "scripts/findings/F106_grid_emitter_and_mle.py",
+   "title": "Emisor y MLE atados a la grilla de la PSF: el emisor se ajusta al nodo y el argmax discreto cuantiza",
+   "class": "DISENO",
+   "legacy_location": "legacy/p-minflux-main/tools/tools_simulations.py:444 (lambda=psf[i,r0[0],r0[1]]), :93-106 (spaceToIndex), :1099 (argmax)",
+   "authorship": "Masullo (diseno original). La autora ya identifico el termino px^2/12 (docx 6.3) y corrigio el truncado.",
+   "scenario": "TCP ideal, fwhm 360, grilla 200 nm/1 nm, SBR 21; (a) emisor pedido (-5.07,-7.56), 200 sim_exp; (b) N=2095/20950/104750, 400 MC, emisor en nodo (5,-5) y fuera (5.4,-5.3)",
+   "impact": "(a) se simula en (-5,-8) (0.45 nm del pedido); media MC (-5.01,-7.86)+-0.06: 'sesgo' respecto del pedido (0.06,-0.30) nm, del nodo (-0.01,0.14). (b) en nodo: RMSE/CRB 1.09, 0.93 y 0.00 (100 % aciertos exactos con CRB 0.115 nm: supereficiencia artificial); fuera de nodo: 1.05, 1.77, 3.40 (sesgo de redondeo (-0.22,0.25) nm).",
+   "fix": "Emisor continuo (lambda evaluado analiticamente o interpolado) y MLE continuo (grilla gruesa + refinamiento); sesgo siempre contra la posicion realmente simulada.",
+   "what_was_right": "spaceToIndex redondea (fix de la autora, F153) y ella ya documento la cuantizacion px^2/12.",
+   "overlaps": "simulation_misalignment.py:230 calcula el sesgo contra R0_NM y no contra el nodo: ambito de W3.",
+   "status": "candidate",
+   "evidence_numbers": {
+    "a_snapping": {
+     "requested_nm": [
+      -5.07,
+      -7.56
+     ],
+     "simulated_node_nm": [
+      -5.0,
+      -8.0
+     ],
+     "snap_offset_nm": 0.44553338819890975,
+     "mc_mean_estimate_nm": [
+      -5.01,
+      -7.86
+     ],
+     "mc_se_nm": [
+      0.06535177328394995,
+      0.05847303205227966
+     ],
+     "bias_vs_requested_nm": [
+      0.0600000000000005,
+      -0.3000000000000007
+     ],
+     "bias_vs_node_nm": [
+      -0.009999999999999787,
+      0.13999999999999968
+     ],
+     "n_rep": 200
+    },
+    "b_quantization": {
+     "on_node_(5,-5) | N=2095": {
+      "crb_nm": 0.8156931473255686,
+      "rmse_nm": 0.8860022573334675,
+      "rmse_over_crb": 1.0861955384061064,
+      "sheppard_prediction_rmse_nm": 0.8652679607654644,
+      "mean_error_nm": [
+       -0.0325,
+       0.0925
+      ],
+      "frac_exact_hits": 0.185
+     },
+     "on_node_(5,-5) | N=20950": {
+      "crb_nm": 0.257944821734008,
+      "rmse_nm": 0.23979157616563598,
+      "rmse_over_crb": 0.9296235317059723,
+      "sheppard_prediction_rmse_nm": 0.3871290022624532,
+      "mean_error_nm": [
+       -0.0125,
+       -0.0375
+      ],
+      "frac_exact_hits": 0.885
+     },
+     "on_node_(5,-5) | N=104750": {
+      "crb_nm": 0.11535643116826141,
+      "rmse_nm": 0.0,
+      "rmse_over_crb": 0.0,
+      "sheppard_prediction_rmse_nm": 0.3108704546032176,
+      "mean_error_nm": [
+       0.0,
+       0.0
+      ],
+      "frac_exact_hits": 1.0
+     },
+     "off_node_(5.4,-5.3) | N=2095": {
+      "crb_nm": 0.8148496297487323,
+      "rmse_nm": 0.855716074407861,
+      "rmse_over_crb": 1.0501521301196766,
+      "sheppard_prediction_rmse_nm": 0.8644728176379981,
+      "mean_error_nm": [
+       -0.05749999999999989,
+       0.010000000000000158
+      ],
+      "frac_exact_hits": 0.0
+     },
+     "off_node_(5.4,-5.3) | N=20950": {
+      "crb_nm": 0.25767807805508913,
+      "rmse_nm": 0.454972526643093,
+      "rmse_over_crb": 1.765662527744499,
+      "sheppard_prediction_rmse_nm": 0.3869513215425138,
+      "mean_error_nm": [
+       -0.07499999999999969,
+       0.05250000000000047
+      ],
+      "frac_exact_hits": 0.0
+     },
+     "off_node_(5.4,-5.3) | N=104750": {
+      "crb_nm": 0.11523713976853522,
+      "rmse_nm": 0.39210967853395307,
+      "rmse_over_crb": 3.4026328605651157,
+      "sheppard_prediction_rmse_nm": 0.3108262082183004,
+      "mean_error_nm": [
+       -0.22250000000000103,
+       0.24499999999999833
+      ],
+      "frac_exact_hits": 0.0
+     }
+    }
+   }
+  },
+  {
+   "id": "F107",
+   "script": "scripts/findings/F107_tmask_ignored_p_minflux.py",
+   "title": "sim_exp('p_minflux') ignora t_mask (parpadeo) en silencio",
+   "class": "IMPLEMENTACION",
+   "legacy_location": "legacy/p-minflux-main/tools/tools_simulations.py:454-466 (_photons_ready=True), :473-491 (mascara solo en la otra ruta)",
+   "authorship": "La autora (refactor de la ruta rapida, comentario l.454-457); a confirmar con el historial",
+   "scenario": "t_mask = 0 en la primera mitad de M_p=2e5 ciclos, Ns=2000, Nb=0",
+   "impact": "p_minflux pone 1028/2000 fotones (51.4 %) en la mitad apagada; cw_minflux con la misma mascara: 0. Latente (todos los estudios pasan t_mask=None).",
+   "fix": "Aplicar la mascara en la ruta rapida (muestrear ciclos con probabilidad proporcional a t_mask) o lanzar error si t_mask no es None.",
+   "what_was_right": "La ruta rapida es estadisticamente equivalente al multinomial original (F152a) y ~100x mas rapida.",
+   "overlaps": "",
+   "status": "candidate",
+   "evidence_numbers": {
+    "p_minflux": {
+     "photons_total": 2000,
+     "photons_in_OFF_half": 1028,
+     "frac_in_OFF_half": 0.514
+    },
+    "cw_minflux": {
+     "photons_total": 2000,
+     "photons_in_OFF_half": 0,
+     "frac_in_OFF_half": 0.0
+    }
+   }
+  },
+  {
+   "id": "F108",
+   "script": "scripts/findings/F108_cov_ellipse.py",
+   "title": "cov_ellipse ordena mal los autovectores y no usa el nivel de confianza",
+   "class": "IMPLEMENTACION",
+   "legacy_location": "legacy/p-minflux-main/tools/tools_simulations.py:80-90",
+   "authorship": "Masullo/Lopez/Richter (original; el TODO de r2 ya estaba)",
+   "scenario": "cov con desvios 3 y 1 nm y eje mayor a phi = 0, 30, 60, 120, 150 grados; nsig = 1, 2",
+   "impact": "Eje mayor devuelto con error de -90, -90, -30, +30, -90 grados (no es un cambio de convencion constante); ejes siempre 2 y 6 para nsig 1 y 2 (correctos: 3.03/9.09 y 4.97/14.92). No se usa en ningun script: latente.",
+   "fix": "vec = vec[:, order] con orden descendente, theta = degrees(arctan2(vec[1,0], vec[0,0])), ejes 2*sqrt(r2*val).",
+   "what_was_right": "",
+   "overlaps": "Sospecha (viii).",
+   "status": "candidate",
+   "evidence_numbers": {
+    "phi=0": {
+     "nsig=1": {
+      "w": 2.0,
+      "h": 6.0,
+      "theta_deg": 0.0,
+      "returned_major_axis_dir_deg": -90.0,
+      "angle_error_deg": -90.0,
+      "correct_major_len": 9.091037423768032,
+      "correct_minor_len": 3.0303458079226773
+     },
+     "nsig=2": {
+      "w": 2.0,
+      "h": 6.0,
+      "theta_deg": 0.0,
+      "returned_major_axis_dir_deg": -90.0,
+      "angle_error_deg": -90.0,
+      "correct_major_len": 14.915853144382664,
+      "correct_minor_len": 4.971951048127555
+     }
+    },
+    "phi=30": {
+     "nsig=1": {
+      "w": 1.9999999999999998,
+      "h": 6.0,
+      "theta_deg": 29.999999999999993,
+      "returned_major_axis_dir_deg": -60.0,
+      "angle_error_deg": -90.0,
+      "correct_major_len": 9.091037423768032,
+      "correct_minor_len": 3.0303458079226773
+     },
+     "nsig=2": {
+      "w": 1.9999999999999998,
+      "h": 6.0,
+      "theta_deg": 29.999999999999993,
+      "returned_major_axis_dir_deg": -60.0,
+      "angle_error_deg": -90.0,
+      "correct_major_len": 14.915853144382664,
+      "correct_minor_len": 4.971951048127555
+     }
+    },
+    "phi=60": {
+     "nsig=1": {
+      "w": 1.9999999999999991,
+      "h": 6.0,
+      "theta_deg": -59.99999999999999,
+      "returned_major_axis_dir_deg": 30.0,
+      "angle_error_deg": -30.0,
+      "correct_major_len": 9.091037423768032,
+      "correct_minor_len": 3.0303458079226773
+     },
+     "nsig=2": {
+      "w": 1.9999999999999991,
+      "h": 6.0,
+      "theta_deg": -59.99999999999999,
+      "returned_major_axis_dir_deg": 30.0,
+      "angle_error_deg": -30.0,
+      "correct_major_len": 14.915853144382664,
+      "correct_minor_len": 4.971951048127555
+     }
+    },
+    "phi=120": {
+     "nsig=1": {
+      "w": 2.0,
+      "h": 6.0,
+      "theta_deg": -119.99999999999999,
+      "returned_major_axis_dir_deg": -29.999999999999986,
+      "angle_error_deg": 30.0,
+      "correct_major_len": 9.091037423768032,
+      "correct_minor_len": 3.0303458079226773
+     },
+     "nsig=2": {
+      "w": 2.0,
+      "h": 6.0,
+      "theta_deg": -119.99999999999999,
+      "returned_major_axis_dir_deg": -29.999999999999986,
+      "angle_error_deg": 30.0,
+      "correct_major_len": 14.915853144382664,
+      "correct_minor_len": 4.971951048127555
+     }
+    },
+    "phi=150": {
+     "nsig=1": {
+      "w": 1.9999999999999998,
+      "h": 6.0,
+      "theta_deg": -29.999999999999993,
+      "returned_major_axis_dir_deg": 60.0,
+      "angle_error_deg": -90.0,
+      "correct_major_len": 9.091037423768032,
+      "correct_minor_len": 3.0303458079226773
+     },
+     "nsig=2": {
+      "w": 1.9999999999999998,
+      "h": 6.0,
+      "theta_deg": -29.999999999999993,
+      "returned_major_axis_dir_deg": 60.0,
+      "angle_error_deg": -90.0,
+      "correct_major_len": 14.915853144382664,
+      "correct_minor_len": 4.971951048127555
+     }
+    }
+   }
+  },
+  {
+   "id": "F109",
+   "script": "scripts/findings/F109_psf_helper.py",
+   "title": "psf(): la rama gaussiana ignora donut_fwhm, la rama SW da NameError y fov_center desplaza x con signo opuesto",
+   "class": "IMPLEMENTACION",
+   "legacy_location": "legacy/p-minflux-main/tools/tools_simulations.py:181-199",
+   "authorship": "donut_fwhm lo agrego la autora (sin actualizar la rama gaussiana); SW/theta y fov_center: original, a confirmar",
+   "scenario": "psf(d='gaussian', donut_fwhm=250); psf(d='sw'); dona en (0,0) con fov_center=(20,20)",
+   "impact": "FWHM gaussiana medida 361 nm (pedida 250); NameError 'SW'; centro real de la grilla (-20.5, 20.5) en vez de (20,20). Latente: todos los usos son d='donut', fov_center=[0,0].",
+   "fix": "Pasar el fwhm a gaussian(); quitar la rama SW; x = arange(-size/2 + c_x, ...), y analogo.",
+   "what_was_right": "La rama 'donut' con fov_center=[0,0] es consistente con indexToSpace (F153).",
+   "overlaps": "Sospecha (viii).",
+   "status": "candidate",
+   "evidence_numbers": {
+    "gaussian_requested_fwhm_nm": 250.0,
+    "gaussian_measured_fwhm_nm": 361.0,
+    "sw_branch": "NameError: name 'SW' is not defined",
+    "fov_center_requested_nm": [
+     20.0,
+     20.0
+    ],
+    "grid_centre_actual_nm": [
+     -20.5,
+     20.5
+    ],
+    "zero_pixel_index_rowcol": [
+     220,
+     220
+    ],
+    "zero_pixel_via_indexToSpace_nm": [
+     20.0,
+     -20.0
+    ]
+   }
+  },
+  {
+   "id": "F110",
+   "script": "scripts/findings/F110_sbr_infinite.py",
+   "title": "SBR=inf (sin fondo) da NaN: pos_MINFLUX devuelve la esquina del FOV y crb_minflux NaN, sin aviso",
+   "class": "IMPLEMENTACION",
+   "legacy_location": "legacy/p-minflux-main/tools/tools_simulations.py:1041, :1050, :649-653",
+   "authorship": "Masullo (expresion SBR/(SBR+1) original)",
+   "scenario": "TCP ideal, grilla 200/1 nm, emisor (5,-5), cuentas esperadas 1000 p, SBR=inf vs 1e12",
+   "impact": "SBR=inf: estimacion (-100,100) nm (pixel (0,0), fuera incluso de r_max) y CRB NaN en toda la grilla; SBR=1e12: (5,-5) y CRB 1.05 nm. Latente.",
+   "fix": "s = 1 si SBR es inf (o parametrizar por s = Ns/(Ns+Nb)).",
+   "what_was_right": "",
+   "overlaps": "",
+   "status": "candidate",
+   "evidence_numbers": {
+    "SBR=inf": {
+     "estimate_nm": [
+      -100.0,
+      100.0
+     ],
+     "estimate_index": [
+      0,
+      0
+     ],
+     "crb_at_emitter_nm": "nan",
+     "crb_all_nan": true
+    },
+    "SBR=1e+12": {
+     "estimate_nm": [
+      5.0,
+      -5.0
+     ],
+     "estimate_index": [
+      105,
+      105
+     ],
+     "crb_at_emitter_nm": 1.0471208967373296,
+     "crb_all_nan": false
+    }
+   }
+  },
+  {
+   "id": "F111",
+   "script": "scripts/findings/F111_ebp_centres_K.py",
+   "title": "ebp_centres falla para K>4 (L=[L,L,L,L]) y los comentarios de paridad estan invertidos",
+   "class": "IMPLEMENTACION",
+   "legacy_location": "legacy/p-minflux-main/tools/tools_simulations.py:266, :273-289",
+   "authorship": "L. Richter (docstring '[Lars]')",
+   "scenario": "ebp_centres(K, 100, True) con K = 4, 5, 7",
+   "impact": "K=5 y K=7: IndexError. K=4 coincide con beams() (angulos 120/240/0), que difiere de ebp.ideal_positions (210/330/90), diferencia ya documentada en C_pminflux_practice.md 5.2. Latente: los estudios actuales usan ebp.py.",
+   "fix": "L = np.full(K, L); corregir comentarios; un solo generador de geometria (ebp.py).",
+   "what_was_right": "La autora centralizo la geometria en ebp.py.",
+   "overlaps": "",
+   "status": "candidate",
+   "evidence_numbers": {
+    "ebp_centres_K=4": "ok",
+    "ebp_centres_K=5": "IndexError: list index out of range",
+    "ebp_centres_K=7": "IndexError: list index out of range",
+    "max_abs_diff_ebp_centres_vs_beams_nm": 0.0,
+    "peripheral_angles_ebp_centres_deg": [
+     119.99999999999999,
+     239.99999999999994,
+     360.0
+    ],
+    "peripheral_angles_ebp_ideal_positions_deg": [
+     210.0,
+     330.0,
+     89.99999999999999
+    ]
+   }
+  }
+ ],
+ "discarded": [
+  {
+   "id": "F105",
+   "script": "scripts/findings/F105_fixed_Ns_Nb_vs_multinomial_crb.py",
+   "title": "(v) Ns y Nb fijos exactos en sim_exp vs el modelo Mult(N,p) del CRB",
+   "legacy_location": "legacy/p-minflux-main/tools/tools_simulations.py:533-559",
+   "evidence": "Real pero despreciable: la sigma del MLE con reparto fijo es 0-0.71 % menor que el CRB multinomial (sandwich; MC donutloc 40000 loc.: 0.9918 +- 0.005 en (5,-5), SBR 21). RMSE/CRB de los estudios queda sesgado a la baja < 1 %.",
+   "status": "descartado",
+   "evidence_numbers": {
+    "analytic": {
+     "study_misalignment_Ns2000_Nb95 | (5,-5)": {
+      "crb_minflux_nm": 0.8156931473162671,
+      "sigma_mle_mult_nm": 0.8156931473162671,
+      "sigma_mle_fixed_split_nm": 0.809867587506209,
+      "ratio_fixed_over_crb": 0.992858147908653
+     },
+     "study_misalignment_Ns2000_Nb95 | (-5.07,-7.56)": {
+      "crb_minflux_nm": 0.848694551613057,
+      "sigma_mle_mult_nm": 0.848694551613057,
+      "sigma_mle_fixed_split_nm": 0.846116556600921,
+      "ratio_fixed_over_crb": 0.9969623994790162
+     },
+     "study_misalignment_Ns2000_Nb95 | (20,0)": {
+      "crb_minflux_nm": 1.0041494976594838,
+      "sigma_mle_mult_nm": 1.0041494976594838,
+      "sigma_mle_fixed_split_nm": 1.004141416160951,
+      "ratio_fixed_over_crb": 0.9999919518970515
+     },
+     "study_example_Ns90_Nb10 | (5,-5)": {
+      "crb_minflux_nm": 4.05613336365862,
+      "sigma_mle_mult_nm": 4.05613336365862,
+      "sigma_mle_fixed_split_nm": 4.037344307815062,
+      "ratio_fixed_over_crb": 0.995367742093517
+     },
+     "study_example_Ns90_Nb10 | (-5.07,-7.56)": {
+      "crb_minflux_nm": 4.167889866459892,
+      "sigma_mle_mult_nm": 4.167889866459892,
+      "sigma_mle_fixed_split_nm": 4.159087664392969,
+      "ratio_fixed_over_crb": 0.9978880914925903
+     },
+     "study_example_Ns90_Nb10 | (20,0)": {
+      "crb_minflux_nm": 4.9033100072707745,
+      "sigma_mle_mult_nm": 4.903310007270774,
+      "sigma_mle_fixed_split_nm": 4.903290021186337,
+      "ratio_fixed_over_crb": 0.9999959239606699
+     },
+     "Edorna_SBR6_Ns2000_Nb333 | (5,-5)": {
+      "crb_minflux_nm": 0.8874579763864565,
+      "sigma_mle_mult_nm": 0.8874579763864565,
+      "sigma_mle_fixed_split_nm": 0.8847284845788125,
+      "ratio_fixed_over_crb": 0.9969243706403339
+     },
+     "Edorna_SBR6_Ns2000_Nb333 | (-5.07,-7.56)": {
+      "crb_minflux_nm": 0.9086145276347081,
+      "sigma_mle_mult_nm": 0.9086145276347081,
+      "sigma_mle_fixed_split_nm": 0.9073837069836815,
+      "ratio_fixed_over_crb": 0.9986453874403367
+     },
+     "Edorna_SBR6_Ns2000_Nb333 | (20,0)": {
+      "crb_minflux_nm": 1.069989051466575,
+      "sigma_mle_mult_nm": 1.069989051466575,
+      "sigma_mle_fixed_split_nm": 1.0699394850056358,
+      "ratio_fixed_over_crb": 0.999953675730727
+     },
+     "low_SBR2_Ns1000_Nb500 | (5,-5)": {
+      "crb_minflux_nm": 1.4198822068237458,
+      "sigma_mle_mult_nm": 1.4198822068237456,
+      "sigma_mle_fixed_split_nm": 1.419427728980981,
+      "ratio_fixed_over_crb": 0.9996799186294605
+     },
+     "low_SBR2_Ns1000_Nb500 | (-5.07,-7.56)": {
+      "crb_minflux_nm": 1.4491005973381903,
+      "sigma_mle_mult_nm": 1.4491005973381903,
+      "sigma_mle_fixed_split_nm": 1.449057094586011,
+      "ratio_fixed_over_crb": 0.9999699794808868
+     },
+     "low_SBR2_Ns1000_Nb500 | (20,0)": {
+      "crb_minflux_nm": 1.7404115137009795,
+      "sigma_mle_mult_nm": 1.7404115137009795,
+      "sigma_mle_fixed_split_nm": 1.7390960891315757,
+      "ratio_fixed_over_crb": 0.9992441876193944
+     }
+    },
+    "mc": {
+     "study_misalignment_Ns2000_Nb95 | (5,-5)": {
+      "sigma_fixed_split_nm": 0.8089162411577193,
+      "sigma_fixed_split_se_nm": 0.00285995079767278,
+      "sigma_multinomial_nm": 0.8155677758721804,
+      "sigma_multinomial_se_nm": 0.0028834675241822456,
+      "ratio_fixed_over_multinomial": 0.9918442894493374
+     },
+     "low_SBR2_Ns1000_Nb500 | (5,-5)": {
+      "sigma_fixed_split_nm": 1.425234170253152,
+      "sigma_fixed_split_se_nm": 0.0050389637328239305,
+      "sigma_multinomial_nm": 1.4303813288313698,
+      "sigma_multinomial_se_nm": 0.005057161686496432,
+      "ratio_fixed_over_multinomial": 0.9964015479827165
+     }
+    }
+   }
+  },
+  {
+   "id": "F151",
+   "script": "scripts/findings/F151_crb_minflux_vs_donutloc.py",
+   "title": "(vii) crb_minflux vs donutloc.fisher",
+   "legacy_location": "legacy/p-minflux-main/tools/tools_simulations.py:583-885",
+   "evidence": "Metodos 1, 2 y 3 coinciden con donutloc dentro de 5.4e-4 (px=1) y 1.3e-4 (px=0.5): error O(px^2) de la diferencia finita. La suma de lambda es constante (dispersion 7e-16): el comentario de l.602-607 es correcto.",
+   "status": "descartado",
+   "evidence_numbers": {
+    "grid_200nm_px1": {
+     "m1": {
+      "max_abs_rel_diff": 0.0005386517606653651,
+      "rel_diffs": [
+       0.0005386517606653651,
+       0.00036951638923854446,
+       0.000288095142527256,
+       0.0001713622660237668,
+       0.00020081177568487263
+      ]
+     },
+     "m2": {
+      "max_abs_rel_diff": 0.0005386517606651431,
+      "rel_diffs": [
+       0.0005386517606651431,
+       0.00036951638923854446,
+       0.000288095142527256,
+       0.00017136226602354476,
+       0.00020081177568487263
+      ]
+     },
+     "m3": {
+      "max_abs_rel_diff": 0.0005386517606675856,
+      "rel_diffs": [
+       0.0005386517606675856,
+       0.00036951638923987673,
+       0.00028809514252814417,
+       0.00017136226602398885,
+       0.00020081177568598285
+      ]
+     },
+     "sum_lambda_rel_spread": 6.821210263296962e-16
+    },
+    "grid_100nm_px0.5": {
+     "m1": {
+      "max_abs_rel_diff": 0.00013465928123124193,
+      "rel_diffs": [
+       0.00013465928123124193,
+       9.237205026968454e-05,
+       7.201406185108894e-05,
+       4.282811371858486e-05,
+       5.020121622667517e-05
+      ]
+     },
+     "m2": {
+      "max_abs_rel_diff": 0.00013465928123124193,
+      "rel_diffs": [
+       0.00013465928123124193,
+       9.237205026968454e-05,
+       7.201406185108894e-05,
+       4.282811371858486e-05,
+       5.020121622667517e-05
+      ]
+     },
+     "m3": {
+      "max_abs_rel_diff": 0.0001346592812301317,
+      "rel_diffs": [
+       0.0001346592812301317,
+       9.237205027057271e-05,
+       7.201406184997872e-05,
+       4.282811371925099e-05,
+       5.0201216216683164e-05
+      ]
+     },
+     "sum_lambda_rel_spread": 6.821210263296962e-16
+    }
+   }
+  },
+  {
+   "id": "F152",
+   "script": "scripts/findings/F152_sampling_and_background_checks.py",
+   "title": "(v) fondo solo en ciclos sin senal y sin recorte TCSPC; muestreo en dos pasos; pliegue % dt",
+   "legacy_location": "legacy/p-minflux-main/tools/tools_simulations.py:454-465, :558-573",
+   "evidence": "Los microtiempos del fondo son independientes de los ciclos: cuentas por ventana chi2 p=0.52 contra Mult(Nb, b/dt); solo absTimeBinary se ve afectado (valores hasta 5). Perdida selectiva por haz que impondria un TCSPC real: <= 3.6e-4 a la tasa de los estudios. Muestreo en dos pasos: ocupacion de ranuras igual al multinomial completo (t-test p = 0.04, 0.99, 0.44, 0.77; exacto por factorizacion). Pliegue: periodico, chi2 p=0.38 (F104).",
+   "status": "descartado",
+   "evidence_numbers": {
+    "a_occupied_slots_mean_two_step": [
+     45.8735,
+     100.52925,
+     122.17525,
+     90.51425
+    ],
+    "a_occupied_slots_mean_full": [
+     45.592,
+     100.5305,
+     122.31475,
+     90.56325
+    ],
+    "a_ttest_pvalues": [
+     0.03788587091245481,
+     0.9942654919811074,
+     0.4415581683966848,
+     0.7723234127532457
+    ],
+    "b_bkg_counts_per_window": [
+     40119.0,
+     40305.0,
+     40538.0,
+     40552.0
+    ],
+    "b_bkg_expected_per_window": 40400.0,
+    "b_chi2_K_dof_pvalue": 0.521523478677622,
+    "b_absTimeBinary_max": 5,
+    "b_cycles_with_absTimeBinary_gt1_per_call": 94.57,
+    "b_max_beam_selective_loss_real_TCSPC_studies": 0.00035625
+   }
+  },
+  {
+   "id": "F153",
+   "script": "scripts/findings/F153_index_space_consistency.py",
+   "title": "spaceToIndex/indexToSpace vs la grilla de psf()",
+   "legacy_location": "legacy/p-minflux-main/tools/tools_simulations.py:93-114, :181-185",
+   "evidence": "0/20 discrepancias entre el minimo de la dona y spaceToIndex (px 1 y 0.5); ida y vuelta dentro de px/2 con error medio < 0.005 nm. El truncado viejo sesgaba (-0.50, +0.50) nm con px=1: el fix de la autora es correcto.",
+   "status": "descartado",
+   "evidence_numbers": {
+    "px=1": {
+     "zero_vs_index_mismatches_of_20": 0,
+     "roundtrip_max_abs_err_over_px": 0.49991464984179856,
+     "roundtrip_mean_err_nm": [
+      0.0049082748754281195,
+      0.0018269231083172799
+     ],
+     "old_truncation_mean_err_nm": [
+      -0.5026917251245717,
+      0.49522692310831734
+     ],
+     "old_truncation_max_abs_err_over_px": 0.9999225479545544
+    },
+    "px=0.5": {
+     "zero_vs_index_mismatches_of_20": 0,
+     "roundtrip_max_abs_err_over_px": 0.49994747271497886,
+     "roundtrip_mean_err_nm": [
+      -0.0014187877965755945,
+      -0.0018456077808969439
+     ],
+     "old_truncation_mean_err_nm": [
+      -0.24971878779657586,
+      0.25365439221910263
+     ],
+     "old_truncation_max_abs_err_over_px": 0.9998778944467972
+    }
+   }
+  },
+  {
+   "id": "F154",
+   "script": "scripts/findings/F154_cw_minflux_branch.py",
+   "title": "(ix) rama cw_minflux",
+   "legacy_location": "legacy/p-minflux-main/tools/tools_simulations.py:389-419, :473-493, :531",
+   "evidence": "Con el haz recuperado del macrotiempo las cuentas siguen s q + (1-s)/K (chi2 p=0.74) y t_mask funciona. Limitacion: nMINFLUX no sirve para cw (88.5 % en la ventana 0) y no hay funcion que cuente por macrotiempo; M_p debe ser multiplo de cycle_time/dt o np.reshape falla con ValueError. Ningun script usa cw.",
+   "status": "descartado",
+   "evidence_numbers": {
+    "counts_from_macrotime": [
+     11639.0,
+     24521.0,
+     29921.0,
+     21919.0
+    ],
+    "expected": [
+     11600.000000000002,
+     24400.000000000007,
+     30000.000000000004,
+     22000.0
+    ],
+    "chi2_pvalue": 0.7440435979239259,
+    "nMINFLUX_fraction_in_window0": 0.8852613636363638,
+    "M_p_not_multiple": "ValueError: cannot reshape array of size 800000 into shape (201000,4)"
+   }
+  },
+  {
+   "id": "D-iv",
+   "script": "",
+   "title": "(iv) docstring de dt 'typically 25 ns'",
+   "legacy_location": "legacy/p-minflux-main/tools/tools_simulations.py:337, :352, :404 ('6.5 ns' en vez de 6.25)",
+   "evidence": "No es un error: 25 ns era el setup de 40 MHz de Masullo (simulations_example.py:47). Los scripts de la autora pasan dt=50 (simulation_misalignment.py:54, make_fig_eficiencia.py:39). Solo actualizar el docstring.",
+   "status": "descartado"
+  },
+  {
+   "id": "D-ii-edges",
+   "script": "",
+   "title": "(ii) desigualdad estricta en los bordes de nMINFLUX",
+   "legacy_location": "legacy/p-minflux-main/tools/tools_simulations.py:996",
+   "evidence": "Los microtiempos son continuos: la unica masa puntual es el 0.0 de los ciclos vacios (F102). Fuera de eso el borde abierto/cerrado no cambia ningun conteo con probabilidad 1.",
+   "status": "descartado"
+  },
+  {
+   "id": "D-vi-nan",
+   "script": "",
+   "title": "(vi) NaN -> -inf en pos_MINFLUX",
+   "legacy_location": "legacy/p-minflux-main/tools/tools_simulations.py:1049-1050",
+   "evidence": "Correcto para los bordes rellenados con ceros (normPSF=0). El unico caso patologico es SBR=inf (F110).",
+   "status": "descartado"
+  }
+ ]
+}
