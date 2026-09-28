@@ -1,0 +1,615 @@
+{
+ "F101": {
+  "detail": "results/findings.json id=F101; verificado por: verifier-A r01: F101 (IMPLEMENTACION, l.522-527/464): en un ciclo con >=2 haces sobrevive el k mas alto; a 0.8/ciclo sim_exp coincide con 'highest' (|z|<=1.5) y se aparta de p hasta 47 SE; a 0.0105: 0.379 % de ciclos con >=2 haces, sesgo relativo maximo 0.461 %",
+  "json_file": "results/findings.json",
+  "json_key": "id=F101",
+  "reproduce": "scripts/findings/F101_tmicro_overwrite.py",
+  "statement": "F101 [IMPLEMENTACION]: sim_exp: en un ciclo con fotones de ≥2 haces sobrevive el de índice k más alto (un TCSPC real se queda con el más temprano)",
+  "type": "script"
+ },
+ "F102": {
+  "detail": "results/findings.json id=F102; verificado por: verifier-A r01: F102 (IMPLEMENTACION latente, l.517/569/996): relTime trae 198000 ceros de 200095; con a=-0.25 la ventana 0 cuenta ~198037 y el error medio del MLE es 70 nm (1.25 nm con a=0); a=0 funciona solo por la desigualdad estricta",
+  "json_file": "results/findings.json",
+  "json_key": "id=F102",
+  "reproduce": "scripts/findings/F102_zeros_in_window0.py",
+  "statement": "F102 [IMPLEMENTACION]: Los ceros de los ciclos vacíos en relTime se cuentan en la ventana 0 si la ventana abre antes del pulso (a < 0)",
+  "type": "script"
+ },
+ "F103": {
+  "detail": "results/findings.json id=F103; verificado por: verifier-A r01: F103 (IMPLEMENTACION latente, l.993-997): nMINFLUX no pliega ventanas ni controla solapamiento; con b=13 cuenta dos veces el 10.9 % (tau=4.21) / 94.9 % (tau=0.001) de los fotones; con a=-0.5 la estimacion asintotica se desplaza 0.338 nm (tau=4.21)",
+  "json_file": "results/findings.json",
+  "json_key": "id=F103",
+  "reproduce": "scripts/findings/F103_windows_not_periodic.py",
+  "statement": "F103 [IMPLEMENTACION]: nMINFLUX no pliega las ventanas módulo el período ni controla el solapamiento",
+  "type": "script"
+ },
+ "F104": {
+  "detail": "results/findings.json id=F104; verificado por: verifier-A r01: F104 (CONCEPTUAL, l.1041, 649-661, comentario l.433): en el setup medido (tau=4.21, [0,10.1], SBR 21) el sesgo asintotico del MLE de la Ec. 3.5 es 0.85/1.51/1.63/2.69/2.36 nm en las 5 posiciones = 1.04-2.67 veces el CRB de crb_minflux (0.82-1.22 nm); el CRB real es 8.6-13.5 % mayor; la ventana 0 en (5,-5) tiene 45.8 % de fotones de otros haces; SBR 6: 0.59-2.32 nm; solo b=10.1: 0.01-0.48 nm (SBR en ventanas 26.06); configuracion de los estudios: 0. Matices: domina la fuga (con b=12.5 ya da 1.05-2.78 nm); ~2.5 puntos del cociente de CRB vienen de los fotones fuera de las ventanas; no cambia numeros publicados (Tlife=0.001)",
+  "json_file": "results/findings.json",
+  "json_key": "id=F104",
+  "reproduce": "scripts/findings/F104_naive_model_windows_leakage.py",
+  "statement": "F104 [CONCEPTUAL]: pos_MINFLUX/crb_minflux (Ec. 3.5: fondo 1/K, sin fuga) no describen ventanas b < T/K ni la fuga entre pulsos",
+  "type": "script"
+ },
+ "F106": {
+  "detail": "results/findings.json id=F106; verificado por: verifier-A r01: F106 (DISENO, l.444/93-106/1099): el emisor (-5.07,-7.56) se simula en el nodo (-5,-8); supereficiencia en el nodo (RMSE=0 con N=104750, CRB 0.115 nm); cuantizacion fuera del nodo RMSE/CRB ~3.3-3.4 con sesgo de redondeo ~(-0.25,0.25) nm",
+  "json_file": "results/findings.json",
+  "json_key": "id=F106",
+  "reproduce": "scripts/findings/F106_grid_emitter_and_mle.py",
+  "statement": "F106 [DISENO]: Emisor y MLE atados a la grilla de la PSF: el emisor se ajusta al nodo y el argmax discreto cuantiza",
+  "type": "script"
+ },
+ "F107": {
+  "detail": "results/findings.json id=F107; verificado por: verifier-A r01: F107 (IMPLEMENTACION latente, l.454-466/473-491): sim_exp('p_minflux') ignora t_mask; 51.35 % de los fotones en la mitad apagada. Autoria a confirmar",
+  "json_file": "results/findings.json",
+  "json_key": "id=F107",
+  "reproduce": "scripts/findings/F107_tmask_ignored_p_minflux.py",
+  "statement": "F107 [IMPLEMENTACION]: sim_exp('p_minflux') ignora t_mask (parpadeo) en silencio",
+  "type": "script"
+ },
+ "F108": {
+  "detail": "results/findings.json id=F108; verificado por: verifier-A r01: F108 (IMPLEMENTACION latente, l.80-90): cov_ellipse usa vec[order] en lugar de vec[:,order]; error del eje mayor -90/-90/-30/+30/-90 grados (convencion matplotlib Ellipse); ejes siempre 2 y 6, sin r2",
+  "json_file": "results/findings.json",
+  "json_key": "id=F108",
+  "reproduce": "scripts/findings/F108_cov_ellipse.py",
+  "statement": "F108 [IMPLEMENTACION]: cov_ellipse ordena mal los autovectores y no usa el nivel de confianza",
+  "type": "script"
+ },
+ "F109": {
+  "detail": "results/findings.json id=F109; verificado por: verifier-A r01: F109 (IMPLEMENTACION latente, l.181-199): la rama gaussiana ignora donut_fwhm (FWHM 361 cuando se piden 250); la rama SW da NameError; fov_center desplaza x con el signo opuesto a y (cero de (0,0) en el indice (120,120) con fov_center (20,20))",
+  "json_file": "results/findings.json",
+  "json_key": "id=F109",
+  "reproduce": "scripts/findings/F109_psf_helper.py",
+  "statement": "F109 [IMPLEMENTACION]: psf(): la rama gaussiana ignora donut_fwhm, la rama SW da NameError y fov_center desplaza x con el signo opuesto a y",
+  "type": "script"
+ },
+ "F110": {
+  "detail": "results/findings.json id=F110; verificado por: verifier-A r01: F110 (IMPLEMENTACION latente, l.1041/1050/649-653): con SBR=inf, pos_MINFLUX devuelve (-100,100) y crb_minflux es NaN en toda la grilla; con 1e12 da (5,-5)",
+  "json_file": "results/findings.json",
+  "json_key": "id=F110",
+  "reproduce": "scripts/findings/F110_sbr_infinite.py",
+  "statement": "F110 [IMPLEMENTACION]: SBR = inf (sin fondo) da NaN: pos_MINFLUX devuelve la esquina del FOV y crb_minflux NaN, sin aviso",
+  "type": "script"
+ },
+ "F111": {
+  "detail": "results/findings.json id=F111; verificado por: verifier-A r01: F111 (IMPLEMENTACION latente, l.266): ebp_centres da IndexError con K=5 y K=7 (center True y False); con K=4 coincide con beams()",
+  "json_file": "results/findings.json",
+  "json_key": "id=F111",
+  "reproduce": "scripts/findings/F111_ebp_centres_K.py",
+  "statement": "F111 [IMPLEMENTACION]: ebp_centres falla para K ≠ 4: L = [L, L, L, L] tiene largo fijo",
+  "type": "script"
+ },
+ "F201": {
+  "detail": "results/findings.json id=F201; verificado por: verifier-B r01: F201: con el pipeline legado (sim_exp+nMINFLUX+pos_MINFLUX, Ns=2000, Nb=95, emisor en el píxel (-5,-8), R=0.75·L_eff, 1000 muestras), pasar de (Tlife=0.001, b=12.5) a (τ=4.21 ns, [0,10.1] ns) lleva el ideal honesto de |b| 0.06–0.11 a 2.96–2.98 nm y RMSE/CRB(sin fuga, 0.864) de 1.07 a 2.73–2.75; se reproduce exactamente con la semilla 20260825 y dentro del ruido con la semilla 777; realista honesta 0.13–0.18 -> 1.88–1.94 nm; realista ingenua 5.4–5.5 -> 10.2–10.9 nm (RMSE 13.0 -> 24–25) || F201: el sesgo asintótico independiente (C propia: C_ii=0.9092, del haz anterior 0.0467; conteos esperados; argmax subpíxel) da (-1.02,-2.67) nm, |b|=2.85, en el ideal C3 y coincide con el MC a 0.1–0.2 nm en los casos honestos; ventana sola 0.30 nm, fuga sola 3.03 nm (domina la fuga) || F201: barrido de eficiencia (ideal, SBR 9): RMSE/CRB sube con la fuga, 0.97->1.19 con N=100 y 0.98->1.53 con N=1600 (semilla propia); los 1.23/1.65 del worker son compatibles dentro del ruido MC",
+  "json_file": "results/findings.json",
+  "json_key": "id=F201",
+  "reproduce": "scripts/findings/F201_leakage_off_in_studies.py",
+  "statement": "F201 [DISENO]: Los estudios apagan la fuga entre pulsos (Tlife = 0.001 ns, a = 0, b = dt/K): con τ = 4.21 ns y la ventana [0, 10.1] ns el ideal honesto pasa de |b| ≈ 0.1 nm a ≈ 3 nm y de RMSE/CRB 1.07 a ≈2.5 (contra el CRB con fuga)",
+  "type": "script"
+ },
+ "F202": {
+  "detail": "results/findings.json id=F202; verificado por: verifier-B r01: F202: realistic_ebp normaliza cada PSF por su máximo y no usa intensity_scale (realistic_ebp.py:100-103,152,181-185); escalas con máx/mín 1.379; p_señal [0.111,0.262,0.314,0.313]->[0.111,0.207,0.342,0.340]; CRB 2.348->2.333 nm; el estimador realista sin potencias sobre datos con potencias queda sesgado 10.6 nm (asintótico 10.60, MC 10.65); la escalera de comparison_metrics.csv se reproduce al 4.º decimal",
+  "json_file": "results/findings.json",
+  "json_key": "id=F202",
+  "reproduce": "scripts/findings/F202_realistic_ebp_drops_beam_power.py",
+  "statement": "F202 [DISENO]: realistic_ebp normaliza cada PSF por su propio máximo y descarta intensity_scale: si el máximo del .npy refleja la potencia del haz, el modelo 'realista' pierde potencias relativas de hasta ×1.379, que en p-MINFLUX fijan p_i",
+  "type": "script"
+ },
+ "F203": {
+  "detail": "results/findings.json id=F203; verificado por: verifier-B r01: F203: el RMSE y el |b| de los ingenuos dependen de R: realista ingenua RMSE 12.1/13.2/50.0/81.9 nm con 0/1/50/87 % en el borde para R=0.5/0.75/1/1.25·L; sustituto 20260703 ingenuo |b| 48/72/96/118 ≈ R−|r0|; el honesto con N=100 también depende de R (realista 12–26 nm); en el log |b|=62.76 > RMSE=46.96 porque el RMSE es por eje",
+  "json_file": "results/findings.json",
+  "json_key": "id=F203",
+  "reproduce": "scripts/findings/F203_naive_rmse_set_by_search_disk.py",
+  "statement": "F203 [DISENO]: En los casos ingenuos (y en los honestos con N bajo) el RMSE y el |sesgo| dependen del radio de búsqueda R; no se reporta la fracción de estimaciones en el borde; la tabla mezcla un RMSE por eje con un |sesgo| 2D",
+  "type": "script"
+ },
+ "F204": {
+  "detail": "results/findings.json id=F204; verificado por: verifier-B r01: F204: con N=100 (SBR 9, 250 muestras), SE real/SE impreso de RMSE/CRB = 1.88 (realistic_fit), 1.63 (sustituto 20260703) y 0.77 (ideal); exceso de curtosis 6.6/4.6 (realista) contra 0.2/0.1 (ideal); piso de ruido de |b| en el ideal ≈0.36 nm con n=250. El '±0.13–0.15' para su 1.89 es una extrapolación desde sustitutos",
+  "json_file": "results/findings.json",
+  "json_key": "id=F204",
+  "reproduce": "scripts/findings/F204_standard_errors_gaussian_assumption.py",
+  "statement": "F204 [DISENO]: Los errores estándar suponen estimaciones normales (std/√(2n), RMSE/√(2n)): con N = 100 y un EBP con pedestal el SE real de RMSE/CRB es 1.6–1.9 veces el impreso; el |sesgo| no descuenta su piso de ruido",
+  "type": "script"
+ },
+ "F205": {
+  "detail": "results/findings.json id=F205; verificado por: verifier-B r01: F205: R0_NM=(-5.07,-7.56) se simula en el píxel (-5,-8) (desplazamiento 0.4455 nm); el |b| honesto ideal es 0.43 contra R0 y 0.02 contra el píxel (1e5 muestras); la geométrica ingenua es 0.31 contra R0 y 0.67 contra el píxel, así que el orden honesto/ingenuo se invierte; la diferencia vectorial (-0.35,0.56) no depende de la referencia. Impacto extra: el RMSE de la escalera también se calcula contra R0 (analyze_realistic_psf.py:88) y pasa de 0.912 a 0.960 nm en el ideal",
+  "json_file": "results/findings.json",
+  "json_key": "id=F205",
+  "reproduce": "scripts/findings/F205_emitter_snapped_to_pixel.py",
+  "statement": "F205 [IMPLEMENTACION]: El sesgo se mide contra R0_NM = (−5.07, −7.56) pero el emisor se simula en el píxel (−5, −8): el desplazamiento de 0.4455 nm aparece como sesgo espurio (|b| 0.43 contra 0.02 nm) y además invierte el orden honesto/ingenuo",
+  "type": "script"
+ },
+ "F206": {
+  "detail": "results/findings.json id=F206; verificado por: verifier-B r01: F206: la cadena run_and_save -> run_final.log -> build_doc no reproduce el documento: 1000 vs 300 muestras, r0 (-5.07,-7.56) vs (5,-5), Ns/Nb 2000/95 vs 90/10, casos Realista (y 'Experimental ingenua 1/2') ausentes del log, parámetros escritos a mano en build_doc.py:535-537 y 812-821; la autora ya lo advierte en ESTADO…md:64-67",
+  "json_file": "results/findings.json",
+  "json_key": "id=F206",
+  "reproduce": "scripts/findings/F206_doc_numbers_vs_scripts.py",
+  "statement": "F206 [DISENO]: La cadena que arma el documento (run_and_save → run_final.log → build_doc) ya no lo reproduce: el script, el log y los parámetros escritos a mano corresponden a configuraciones distintas",
+  "type": "script"
+ },
+ "claim-D4": {
+  "detail": "state.json claims[43] (status=verified, ronda 1, verifier)",
+  "ledger_status": "verified",
+  "reproduce": "equipo/2026-09-28_review-pminflux-sim/state.json",
+  "statement": "F290-D4: con Tlife=0.001 y b=dt/K, las fracciones por ventana de sim_exp coinciden con el modelo 1/K (628 500 fotones, |z| ≤ 1.3). No reproduzco el +2.6σ del haz 3 que el worker atribuye a F101; parece una fluctuación",
+  "type": "data"
+ },
+ "claim-D7": {
+  "detail": "state.json claims[46] (status=verified, ronda 1, verifier)",
+  "ledger_status": "verified",
+  "reproduce": "equipo/2026-09-28_review-pminflux-sim/state.json",
+  "statement": "F290-D7: la comparación honesta/ingenua es justa (una semilla antes de todos los casos, mismo r0, SBR y R_SEARCH_NM; simulation_misalignment.py:250-256)",
+  "type": "data"
+ },
+ "claim-F103-corr": {
+  "detail": "state.json claims[13] (status=refuted, ronda 1, verifier)",
+  "ledger_status": "refuted",
+  "reproduce": "equipo/2026-09-28_review-pminflux-sim/state.json",
+  "statement": "F103-num: 'la ventana 0 pierde 5.9 % (tau=4.21) / 2.8 % (0.001)' — la perdida esperada es 6.84 % / 2.54 % (los valores de W2 son MC de 30 llamadas); ademas el '0.34 nm de sesgo extra' es un desplazamiento: con tau=4.21 el sesgo total con las ventanas del legado (0.88 nm) es menor que con ventanas periodicas (1.18 nm)",
+  "type": "data"
+ },
+ "claim-F111-corr": {
+  "detail": "state.json claims[21] (status=refuted, ronda 1, verifier)",
+  "ledger_status": "refuted",
+  "reproduce": "equipo/2026-09-28_review-pminflux-sim/state.json",
+  "statement": "F111-comentarios: 'los comentarios de paridad estan invertidos' — en la rama sin centro son correctos; en la rama con centro solo son incorrectos si K se lee como el total de haces (son correctos para Ktheta=K-1)",
+  "type": "data"
+ },
+ "claim-F201-corr": {
+  "detail": "state.json claims[32] (status=unclear, ronda 1, verifier)",
+  "ledger_status": "unclear",
+  "reproduce": "equipo/2026-09-28_review-pminflux-sim/state.json",
+  "statement": "F201: la clase CONCEPTUAL — con el criterio del PI (parámetro o supuesto no declarado) corresponde DISENO, y lo conceptual ya es F104. Además hay que acreditar que la autora anotó 'IRF y lifetime medidos' como pendiente (ESTADO_Y_PLAN_REALISMO_PSF.md:115-117) y que el 2.75 es respecto del CRB sin fuga (el CRB con fuga es 0.945 nm, cociente ≈2.5). Decide el PI",
+  "type": "data"
+ },
+ "claim-F203-corr": {
+  "detail": "state.json claims[36] (status=refuted, ronda 1, verifier)",
+  "ledger_status": "refuted",
+  "reproduce": "equipo/2026-09-28_review-pminflux-sim/state.json",
+  "statement": "F203: 'el 100 % de las estimaciones ingenuas (sustituto) queda en el borde para los cuatro R' — con R=1.25·L es el 71–72 % (sus propios datos en w3/F203_out.json y los míos); vale para R ≤ 1.0·L. Con el R de ella (0.75) y el EBP realista, el ingenuo solo tiene un 1 % en el borde",
+  "type": "data"
+ },
+ "claim-F204-corr": {
+  "detail": "state.json claims[37] (status=verified, ronda 1, verifier)",
+  "ledger_status": "verified",
+  "reproduce": "equipo/2026-09-28_review-pminflux-sim/state.json",
+  "statement": "F204: con N=100 (SBR 9, 250 muestras), SE real/SE impreso de RMSE/CRB = 1.88 (realistic_fit), 1.63 (sustituto 20260703) y 0.77 (ideal); exceso de curtosis 6.6/4.6 (realista) contra 0.2/0.1 (ideal); piso de ruido de |b| en el ideal ≈0.36 nm con n=250. El '±0.13–0.15' para su 1.89 es una extrapolación desde sustitutos",
+  "type": "data"
+ },
+ "claim-F205-corr": {
+  "detail": "state.json claims[80] (status=verified, ronda 2, verifier)",
+  "ledger_status": "verified",
+  "reproduce": "equipo/2026-09-28_review-pminflux-sim/state.json",
+  "statement": "W1-R2 F205, sentido resuelto: analyze_realistic_psf.py:88 calcula el RMSE contra R0=(-5.07,-7.56); con 1e5 muestras (MLE de grilla propio) da 0.962 nm en el ideal (0.948 en la geometría), mientras que contra el píxel realmente simulado (-5,-8) da 0.913 (0.898). 0.912 es el valor correcto y 0.960 el que produce el script legado (inflado por el desplazamiento de 0.4455 nm); 'pasa de 0.912 a 0.960' describe la inflación, no una corrección. El honest_rmse_nm=0.9122 (etapa geometry) del CSV de la autora es un MC chico de la cantidad inflada (esperado 0.948, SE~0.037); que coincida es casualidad",
+  "type": "data"
+ },
+ "claim-autoria": {
+  "detail": "state.json claims[28] (status=unclear, ronda 1, verifier)",
+  "ledger_status": "unclear",
+  "reproduce": "equipo/2026-09-28_review-pminflux-sim/state.json",
+  "statement": "AUTORIA F101-F111: no se puede verificar; no hay historial git (tampoco en GithubPRO/p-minflux-main). Solo se sostiene el docstring [Lars] de ebp_centres y que el comentario 'EXACTAMENTE' y el fast path estan en el espanol de la autora",
+  "type": "data"
+ },
+ "claim-cmp-verif": {
+  "detail": "state.json claims[73] (status=verified, ronda 2, verifier)",
+  "ledger_status": "verified",
+  "reproduce": "equipo/2026-09-28_review-pminflux-sim/state.json",
+  "statement": "W3-R2 tabla compare_legacy_vs_v2 reproducida en los 20 casos con simulador, MLE y CRB propios y otra semilla: CRB_mezcla y crb_minflux idénticos a 3 decimales; legado |b| 0.556-2.712 nm, RMSE/CRB 1.110-2.052 (peor caso (-15,15) SBR21 IRF0.3: 2.052 vs 2.059); MLE de mezcla RMSE/CRB 0.971-1.033, |b|<=0.10 nm",
+  "type": "data"
+ },
+ "claim-crbratio": {
+  "detail": "state.json claims[74] (status=verified, ronda 2, verifier)",
+  "ledger_status": "verified",
+  "reproduce": "equipo/2026-09-28_review-pminflux-sim/state.json",
+  "statement": "W3-R2 CRB_mezcla/crb_minflux = 1.0859-1.1349 en el setup de F104 (SBR 21, IRF 0); en los 20 casos el rango es 1.068 (SBR 6) - 1.144 (SBR 21, IRF 0.3)",
+  "type": "data"
+ },
+ "claim-dnT": {
+  "detail": "state.json claims[68] (status=verified, ronda 2, verifier)",
+  "ledger_status": "verified",
+  "reproduce": "equipo/2026-09-28_review-pminflux-sim/state.json",
+  "statement": "W2-R2 barrido de tiempo muerto: el sesgo 'earliest' desaparece exactamente para dead_time = n*T (50, 100 ns) a cualquier tasa — prueba: con SPAD no paralizable y d>=T cabe <=1 avalancha en una ventana de largo d, P(muerto en t)=int_{t-d}^{t} r(s)ds = n*(avalanchas por período) = constante, así que la densidad registrada es proporcional a lambda(t); con d=35 y 75 ns vuelve (a 0.0105/ciclo, predicho a primer orden [-.001,.038,.011,-.053] y [.006,.053,-.018,-.041] SE/loc; MC propio 4e7 [.009,.030,.003,-.040] y [.005,.047,-.016,-.036]; v2 4e7 coincide, dos muestras p=0.45/0.99); d=50/100: propio y v2 p=0.43-0.88",
+  "type": "data"
+ },
+ "claim-highest-sbr": {
+  "detail": "state.json claims[83] (status=unclear, ronda 2, verifier)",
+  "ledger_status": "unclear",
+  "reproduce": "equipo/2026-09-28_review-pminflux-sim/state.json",
+  "statement": "W2-R2 'highest reproduce sim_exp' con fondo a tasa alta — v2 fija el SBR incidente y recorta la señal registrada por (1-e^-x)/x, mientras sim_exp fija Ns:Nb registrados; a 0.0105/ciclo es 0.5 % del SBR (despreciable) y a 0.3/ciclo con fondo ~14 %; los tests de highest usan sbr=inf. Falta decidir si se documenta como limitación",
+  "type": "data"
+ },
+ "claim-overlap": {
+  "detail": "state.json claims[56] (status=refuted, ronda 2, code-reviewer)",
+  "ledger_status": "refuted",
+  "reproduce": "equipo/2026-09-28_review-pminflux-sim/state.json",
+  "statement": "Robustez del estimador y del CRB con b > T/K no está garantizada ni avisada: con b=20, r0=(-15,15) y datos v2sim N=2095, mle_mixing (grid_step por defecto) cae en un óptimo local equivocado en 193/300 locs (16.7 nm de error medio) con converged=True y n_failed=0, e incluso con conteos exactos devuelve (-13.5, 41.0); con b=30 RMSE/CRB=0.575 (CRB multinomial inválida con ventanas solapadas). Sin guard en simulate/crb/mle_mixing",
+  "type": "data"
+ },
+ "claim-perf": {
+  "detail": "state.json claims[57] (status=unclear, ronda 2, code-reviewer)",
+  "ledger_status": "unclear",
+  "reproduce": "equipo/2026-09-28_review-pminflux-sim/state.json",
+  "statement": "Rendimiento: el arranque en grilla del MLE no está partido en bloques (359 MB con 1e5 locs, ~3.6 GB con 1e6; free_powers lo repite en cada evaluación); el punto fijo del tiempo muerto es O(n^2) a saturación (d=500 ns, 0.3/ciclo: 13.3 s y 448 MB para 1e6 fotones). Bien a las tasas del tracking",
+  "type": "data"
+ },
+ "claim-resid": {
+  "detail": "state.json claims[76] (status=refuted, ronda 2, verifier)",
+  "ledger_status": "refuted",
+  "reproduce": "equipo/2026-09-28_review-pminflux-sim/state.json",
+  "statement": "W3-R2 'el sesgo MC del MLE de mezcla en v2sim coincide con el sesgo implícito de las fracciones, así que no viene del estimador; <=0.11 nm' — el sesgo inducido por la tasa finita es ~0.02-0.035 nm (primer orden y MC con 20000 locs: +0.02 nm en x frente a multinomial); en (0,-30) SBR21 el MLE tiene by=-0.036±0.011 nm también con datos multinomiales puros (sesgo O(1/N) del MLE a N~2000, no un bug); el 0.092±0.023 de (20,0) SBR6 es ~0.03 real más una fluctuación de 2.6 sigma. La cota <=0.11 nm es verdadera pero ~3 veces holgada; todo es <=0.03 CRB",
+  "type": "data"
+ },
+ "claim-subst": {
+  "detail": "state.json claims[48] (status=verified, ronda 1, verifier)",
+  "ledger_status": "verified",
+  "reproduce": "equipo/2026-09-28_review-pminflux-sim/state.json",
+  "statement": "Sustitución de datos: C:\\Data\\psf\\20260820 no existe; los EBP ideal/geom_exp/realistic_fit se reconstruyen de forma exacta (la escalera se reproduce al 4.º decimal), el sustituto 20260703 está rotulado en findings_B.json, y ninguna conclusión cualitativa de F201–F206 depende de él; los números 'Experimental' exactos (18.35/62.76/1.89) no se reprodujeron, y eso está declarado",
+  "type": "data"
+ },
+ "claim-v2tests": {
+  "detail": "state.json claims[81] (status=verified, ronda 2, verifier)",
+  "ledger_status": "verified",
+  "reproduce": "results/findings.json",
+  "statement": "W1-R2 findings.json: los 17 ids distintos de v2_test/v2_tests de las 16 entradas existen y pasan (python -m unittest: 17 OK); F107 tiene v2_test null; compare_legacy_vs_v2.json tiene source v2sim y sha256 de simulate/estimate iguales a los archivos actuales",
+  "type": "data"
+ },
+ "cmp-cases": {
+  "detail": "results/compare_legacy_vs_v2.json: cases[*].estimators, crb_*, legacy_asymptotic_bias_nm; verificado en R2 (verifier W3-R2 y code-reviewer)",
+  "json_file": "results/compare_legacy_vs_v2.json",
+  "reproduce": "scripts/compare_legacy_vs_v2.py",
+  "statement": "Comparación legado (Ec. 3.5) contra MLE de mezcla sobre datos v2sim: 20 casos (results/compare_legacy_vs_v2.json)",
+  "type": "script"
+ },
+ "criterion": {
+  "detail": "clave criterion; reports/r01-pi.md:54-56; inbox.jsonl ronda 2",
+  "reproduce": "results/findings_A.json",
+  "statement": "Criterio de clasificación del PI",
+  "type": "data"
+ },
+ "deriv-tail": {
+  "detail": "cálculo en scripts/build_report.py (TAIL)",
+  "reproduce": "exp(-12.5/4.21) con T, K, tau de results/mixing_validation.json",
+  "statement": "Fracción de la cola exponencial que sobrevive un intervalo entre pulsos: exp(-(T/K)/tau)",
+  "type": "derivation"
+ },
+ "discarded": {
+  "detail": "status discarded-verified salvo F154 (unclear)",
+  "reproduce": "results/findings_discarded.json",
+  "statement": "Sospechas descartadas y verificadas (F105, F151–F154, D-*, F290-D*)",
+  "type": "data"
+ },
+ "dt-sweep": {
+  "detail": "results/dead_time_sweep.json: rows[*].max_abs_bias_SE_per_loc, p_vs_ideal; verificado por W2-R2 (barrido de tiempo muerto)",
+  "json_file": "results/dead_time_sweep.json",
+  "reproduce": "scripts/sweep_dead_time.py",
+  "statement": "Barrido de tiempo muerto: sesgo por ventana del simulador v2 frente a la mezcla ideal, en SE por localización (results/dead_time_sweep.json)",
+  "type": "script"
+ },
+ "fig-dead_time_sweep": {
+  "detail": "datos: results/dead_time_sweep.json:rows[*].max_abs_bias_SE_per_loc,rows[*].mc_se_in_SE_per_loc,assumptions; png sha256 d6e845b5ce6472cc1417fca1174190c04d8ef345f4f3a0382a214db6f4bafeb3",
+  "reproduce": "scripts/make_report_figures.py",
+  "statement": "Figura dead_time_sweep.png: Máximo |sesgo| sobre las 4 ventanas de las fracciones del simulador v2 frente a la mezcla ideal (window_probs), en SE de una localización de 2000 fotones (3000 localizaciones por punto, semilla 20260928, IRF 0.3 ns, SBR 21), para TCSPC 'earliest' con tiempo muerto d = 0/22/50/100 ns y para 'highest' (emulación de sim_exp). El tiempo muerto de 22 ns es un SUPUESTO (valor típico de SPAD), no un valor medido. Con d = n·T (50 y 100 ns) el sesgo se anula exactamente (resultado demostrado y verificado): 0.012–0.024 y 0.015–0.034 SE, dentro del ruido de MC (franja gris, 2·SE_MC ≈ 0.037; p del χ² contra la mezcla ≥ 0.30). Con d = 22 ns: 0.030 SE a 1e-3, 0.079 a 5.5e-3 y 0.099 a 0.0105 fotones/ciclo. Conclusión: en el régimen de tracking el sesgo por tasa finita es ≤0.08 SE por localización.",
+  "type": "script"
+ },
+ "fig-f201_leakage": {
+  "detail": "datos: equipo/2026-09-28_review-pminflux-sim/work/w3/F201_out.json:study_A.*.{C0,C3}.{bias_abs,rmse},study_A.*.crb; results/findings.json:F201.impact (CRB con fuga); png sha256 4b7c9261eee49ff4b80080b2018a89ad07f233b3c8b532be6f1a6eebd0aed25b",
+  "reproduce": "scripts/make_report_figures.py",
+  "statement": "Figura f201_leakage.png: Pipeline legado (sim_exp + nMINFLUX + pos_MINFLUX; Ns 2000, Nb 95, emisor en el píxel (−5, −8), 1000 muestras) con los parámetros de los estudios (Tlife = 0.001 ns, b = 12.5 ns; celeste) y con los del experimento (τ = 4.21 ns, ventanas [0, 10.1] ns; rojo rayado), para cada EBP × estimador (honesto = modelo correcto del EBP; ingenuo = geometría ideal). Ideal honesto: |sesgo| 0.11 → 2.98 nm; RMSE/CRB 1.07 → 2.75 contra el CRB sin fuga (0.864 nm) que usa el estudio (cociente RMSE/CRB calculado aquí de las claves rmse y crb), o ≈2.5 contra el CRB con fuga (0.945 nm, rombo). Realista ingenua: 5.5 → 10.8 nm. Escalas logarítmicas; ±SE de Monte Carlo en el sesgo. Conclusión: la conclusión \"el honesto alcanza el CRB\" vale sin fuga, no en el experimento a 20 MHz (clase DISEÑO).",
+  "type": "script"
+ },
+ "fig-legacy_vs_v2": {
+  "detail": "datos: results/compare_legacy_vs_v2.json:cases[*].estimators.{legacy,mixing,mixing_freebg}.{bias_abs,rmse_over_crb},cases[*].legacy_asymptotic_bias_nm; png sha256 b1674adae84403102f76f303617239979614f1cb356ae638af4c7645228cb7e4",
+  "reproduce": "scripts/make_report_figures.py",
+  "statement": "Figura legacy_vs_v2.png: |sesgo| (arriba, nm) y RMSE/CRB (abajo) de 2000 localizaciones por caso, con barras de ±SE por bootstrap (500 remuestreos), para el MLE legado de la Ec. 3.5, el MLE con matriz de mezcla y el MLE de mezcla con fondo libre por localización. Datos del simulador v2 (source = v2sim), Ns = 2000, en 5 posiciones (P1 = (5, -5), P2 = (-5.07, -7.56), P3 = (20, 0), P4 = (-15, 15), P5 = (0, -30) nm), SBR 21/6 e IRF 0/0.3 ns. El legado tiene un sesgo de 0.57–2.69 nm (RMSE/CRB 1.12–2.06) que sigue al sesgo asintótico calculado (guion negro); los dos estimadores de mezcla quedan en 0.011–0.112 nm y RMSE/CRB 0.982–1.022. El CRB es el del modelo con fuga (con fondo libre, el suyo). Conclusión: modelar la fuga elimina el sesgo (F104) y alcanza el CRB con fuga.",
+  "type": "script"
+ },
+ "fig-mixing_validation": {
+  "detail": "datos: results/mixing_validation.json:frac_observed,frac_mixing,frac_naive,dev_se_mixing,dev_se_naive,chi2_pvalue_mixing_vs_sim_exp,chi2_pvalue_naive_vs_sim_exp; png sha256 d91570c7239ce2236804a4a4fff9116907bd02a4a9f0b811a955709c4571d37e",
+  "reproduce": "scripts/make_report_figures.py",
+  "statement": "Figura mixing_validation.png: Fracciones por ventana que produce sim_exp + nMINFLUX del legado (2000 llamadas, 4.16e+06 fotones en ventanas, 1e-03 fotones/ciclo, λ = [0.12, 0.28, 0.35, 0.25], SBR 10) frente al modelo de mezcla (C con τ = 4.21 ns y ventanas [0, 10.1] ns) y al modelo ingenuo sin fuga de pos_MINFLUX/crb_minflux (Ec. 3.5). Las barras de ±SE (≈2e-4) son más chicas que el trazo. Derecha: desvío por ventana en unidades de SE. La mezcla es consistente (χ² = 5.66, 3 g.l., p = 0.129; desvíos entre -1.6 y +2.2 SE) y el ingenuo queda rechazado (χ² = 1927, desvío de +27.6 SE en la ventana 0). Conclusión: sim_exp sí tiene fuga entre pulsos y el estimador legado no la modela.",
+  "type": "script"
+ },
+ "fig-rate_sweep": {
+  "detail": "datos: results/mixing_rate_sweep.json:points[*].pred_highest_minus_mixing_in_se_per_2000ph_localization,points[*].pred_earliest_minus_mixing_in_se,studies_config; png sha256 6a1f07e2ecc7c573ff9ba1a8bbf601671f52eb9e82daa09b7b0789dfa56da2e7",
+  "reproduce": "scripts/make_report_figures.py",
+  "statement": "Figura rate_sweep.png: Máximo sobre las 4 ventanas del desvío predicho (exacto a tasa finita, pminflux_sim.mixing) entre las fracciones por ventana y el modelo de mezcla (tasa → 0), en SE de una localización de 2000 fotones, frente a la tasa por ciclo (Ns 2000, Nb 200, λ = [0.12, 0.28, 0.35, 0.25], τ = 4.21, [0, 10.1] ns). 'earliest' se reescaló de SE totales a SE por localización con √(2000/n_detected_total), el mismo factor que reproduce la clave de 'highest'. Las dos curvas se superponen: 'earliest' tiene la misma magnitud y el signo opuesto. En los puntos calculados dentro de la banda del tracking (1e-3–5.5e-3 fotones/ciclo) el desvío es ≤ 0.026 SE (0.009 a 1e-3, 0.026 a 3e-3). Crece de forma lineal con la tasa: 0.086 a 0.01, 0.90 a 0.1 y 3.06 a 0.3/ciclo. Los rombos/triángulos son la configuración de los estudios a 0.0105/ciclo (0.093 y 0.097 SE). Conclusión: la sobrescritura por ciclo de sim_exp (F101) existe, pero no importa en el régimen del tracking.",
+  "type": "script"
+ },
+ "fig-timeline_20MHz": {
+  "detail": "datos: results/mixing_validation.json:C_no_irf (recalculado con pminflux_sim.mixing.mixing_matrix); png sha256 b2a3b968d5a283184590948160d236f31ad962be4e3fe8c4c51bcc7da33a490a",
+  "reproduce": "scripts/make_report_figures.py",
+  "statement": "Figura timeline_20MHz.png: Esquema analítico (pminflux_sim.mixing, sin simulación) de un ciclo TCSPC de T = 50 ns con K = 4 pulsos cada 12.5 ns. Arriba, el setup medido: decaimiento exponencial τ = 4.21 ns con IRF gaussiana de 0.3 ns FWHM (recuadro) y ventanas [i·12.5, i·12.5 + 10.1] ns. La cola del haz 0 (rayado) cae dentro de la ventana 1: C[1][0] = 0.0467, es decir un 4.7 % de los fotones del haz 0 se cuentan como del haz 1 (C[i][i] = 0.9092). Abajo, el supuesto de los estudios legados (Tlife = 0.001 ns, b = 12.5 ns): los pulsos son instantáneos y la fuga es nula. Si se simula así, el estudio no puede ver el desajuste del estimador sin fuga (el \"crimen inverso\" F104+F201). C sin IRF, igual a results/mixing_validation.json:C_no_irf.",
+  "type": "script"
+ },
+ "findings-all": {
+  "detail": "todas las entradas con status=verified; el test de aceptación lo comprueba",
+  "json_file": "results/findings.json",
+  "reproduce": "results/findings.json",
+  "statement": "Registro de 16 hallazgos verificados",
+  "type": "data"
+ },
+ "ledger": {
+  "detail": "state.json claims[*].status",
+  "reproduce": "equipo/2026-09-28_review-pminflux-sim/state.json",
+  "statement": "Conteo de afirmaciones del ledger por estado",
+  "type": "data"
+ },
+ "mix-valid": {
+  "detail": "results/mixing_validation.json: C_no_irf, C_irf_300ps_fwhm, frac_*, dev_se_*, chi2_*, chi2_pvalue_*, n_detected_total, rate_per_cycle; verificado por MIX-C/MIX-IRF/MIX-VALID",
+  "json_file": "results/mixing_validation.json",
+  "reproduce": "scripts/validate_mixing_matrix.py",
+  "statement": "Validación de la matriz de mezcla contra sim_exp: C, fracciones, chi2 y p-valores (results/mixing_validation.json)",
+  "type": "script"
+ },
+ "mixclaim-MIX-ACCFORMULA": {
+  "detail": "id=MIX-ACCFORMULA, status=verified, verifier-A r01",
+  "reproduce": "results/mixing_claims.json",
+  "statement": "MIX-ACCFORMULA: la formula de C del test de aceptacion omite la imagen m=-1 cuando la ventana cruza T (K=3, tau=8, a=2, b=16: falta 1-exp(-1.33/8)=0.153); no afecta la configuracion de referencia",
+  "type": "data"
+ },
+ "mixclaim-MIX-C": {
+  "detail": "id=MIX-C, status=verified, verifier-A r01",
+  "reproduce": "results/mixing_claims.json",
+  "statement": "MIX-C: C periodico sin IRF (tau=4.21, T=50, K=4, [0,10.1]) C_ii=0.9092021, C[i][i-1]=0.0466861, C[i][i-2]=0.0023973, C[i][i-3]=0.0001231, suma de columna 0.9584086 (plegado numerico propio + MC 2e7)",
+  "type": "data"
+ },
+ "mixclaim-MIX-EARLIEST": {
+  "detail": "id=MIX-EARLIEST, status=verified, verifier-A r01",
+  "reproduce": "results/mixing_claims.json",
+  "statement": "MIX-EARLIEST: un TCSPC de primer foton sesga en espejo respecto de sim_exp; a 0.3/ciclo ea-mix=[+0.0153,+0.0210,-0.0081,-0.0282] (propio: +0.01532,+0.02104,-0.00812,-0.02824); los datos de sim_exp rechazan 'earliest' (p=1.6e-15 a 5e-3)",
+  "type": "data"
+ },
+ "mixclaim-MIX-HIGHEST": {
+  "detail": "id=MIX-HIGHEST, status=verified, verifier-A r01",
+  "reproduce": "results/mixing_claims.json",
+  "statement": "MIX-HIGHEST: el predictor 'gana el k mas alto' (recorte por ranura + sobrescritura) describe sim_exp de 1e-3 a 0.3/ciclo; datos propios: p=0.79 (1e-3), 0.76 (5e-3), 0.77 (0.0105, 1.8e7 fotones), 0.14 (0.1); predictor propio por patrones = numeros de W1 dentro de 1e-6",
+  "type": "data"
+ },
+ "mixclaim-MIX-IRF": {
+  "detail": "id=MIX-IRF, status=verified, verifier-A r01",
+  "reproduce": "results/mixing_claims.json",
+  "statement": "MIX-IRF: con IRF gaussiana 300 ps FWHM centrada en el pulso, C_ii=0.8973135, C[i][i-1]=0.0467075, suma de columna 0.94654 (cuadratura propia; MC 0.897194+-6.8e-5). Supuesto a declarar: IRF centrada en el pulso y ventana que abre en 0",
+  "type": "data"
+ },
+ "mixclaim-MIX-NDETECT": {
+  "detail": "id=MIX-NDETECT, status=verified-corrected, verifier-A r01",
+  "reproduce": "results/mixing_claims.json",
+  "statement": "MIX-NDETECT (corregida): entre 1e-3 y 5e-3 fotones/ciclo el sesgo de sim_exp respecto de la mezcla ideal se puede detectar en conjunto; a 5e-3 bastan ~1e7 fotones (el verificador A lo detectó con 1.2e7: mezcla p = 4.6e-4, 'highest' p = 0.76). El número necesario escala ~1/tasa², así que el 3e7 corresponde a 3e-3 (y ~2.5e8 a 1e-3 por la misma escala; W1 dio 2.6e8, sin re-correr). Por localización de 2000 fotones sigue siendo ≤0.05 SE (MIX-TRACKING).",
+  "type": "data"
+ },
+ "mixclaim-MIX-STUDY": {
+  "detail": "id=MIX-STUDY, status=verified, verifier-A r01",
+  "reproduce": "results/mixing_claims.json",
+  "statement": "MIX-STUDY: a 0.0105/ciclo (M_p=2e5, Nh=2100) sim_exp se aparta de la mezcla ideal de forma detectable en conjunto (propio: p=2e-22 con 1.8e7 fotones), pero por localizacion de 2000 fotones es <=0.09 SE (lambda de W1) / 0.10 SE (lambda propio); sesgo [-4.58e-4,-6.67e-4,+2.16e-4,+9.09e-4] para el lambda de W1",
+  "type": "data"
+ },
+ "mixclaim-MIX-TRACKING": {
+  "detail": "id=MIX-TRACKING, status=verified, verifier-A r01",
+  "reproduce": "results/mixing_claims.json",
+  "statement": "MIX-TRACKING: de 1e-3 a 5e-3/ciclo el sesgo por ventana es 1e-4 a 5e-4, <=0.05 SE por localizacion de 2000 fotones",
+  "type": "data"
+ },
+ "mixclaim-MIX-VALID": {
+  "detail": "id=MIX-VALID, status=verified, verifier-A r01",
+  "reproduce": "results/mixing_claims.json",
+  "statement": "MIX-VALID: a ~1e-3 fotones/ciclo sim_exp+nMINFLUX es consistente con el modelo de mezcla y rechaza el ingenuo (Ec. 3.5); reproducido de forma independiente con lambda=[0.4,0.1,0.2,0.3]: SBR 5, 3.14e6 fotones, mezcla p=0.42 vs ingenuo chi2=2780; Nb=0 p=0.61 vs 3593; Nb=95 a 1e-3 p=0.69 vs 5773. Los digitos exactos de W1 (chi2 5.66, p=0.129) no se re-corrieron",
+  "type": "data"
+ },
+ "mod-estimate": {
+  "detail": "sha256 6c3f9591e77e6ed9b9b2fd7a025ae72c2c250558504f3c2120a7767974d7704c",
+  "reproduce": "src/pminflux_sim/estimate.py",
+  "statement": "Módulo pminflux_sim.estimate",
+  "type": "script"
+ },
+ "mod-mixing": {
+  "detail": "sha256 e3acbbd24c53c29201e7a8b779323bd3f3ca4080d61954775535e7c74c7c2f3e",
+  "reproduce": "src/pminflux_sim/mixing.py",
+  "statement": "Módulo pminflux_sim.mixing",
+  "type": "script"
+ },
+ "mod-psf": {
+  "detail": "sha256 03b2d894ac2cecbab242b85ddeb2da41e135d978201dac05272bdb8a4d8831f1",
+  "reproduce": "src/pminflux_sim/psf.py",
+  "statement": "Módulo pminflux_sim.psf",
+  "type": "script"
+ },
+ "mod-simulate": {
+  "detail": "sha256 fb77ec32b390931c1b6747899a7bfb10b69bac50aadf3298aa6fad6b73df6761",
+  "reproduce": "src/pminflux_sim/simulate.py",
+  "statement": "Módulo pminflux_sim.simulate",
+  "type": "script"
+ },
+ "mod-windows": {
+  "detail": "sha256 458621e8d243bbeca43ca95b524fb42b199b7355e505ecbd9274e656b969e6db",
+  "reproduce": "src/pminflux_sim/windows.py",
+  "statement": "Módulo pminflux_sim.windows",
+  "type": "script"
+ },
+ "open-13": {
+  "detail": "state.json claims[13] (status=refuted, ronda 1, verifier)",
+  "reproduce": "equipo/2026-09-28_review-pminflux-sim/state.json",
+  "statement": "F103-num: 'la ventana 0 pierde 5.9 % (tau=4.21) / 2.8 % (0.001)' — la perdida esperada es 6.84 % / 2.54 % (los valores de W2 son MC de 30 llamadas); ademas el '0.34 nm de sesgo extra' es un desplazamiento: con tau=4.21 el sesgo total con las ventanas del legado (0.88 nm) es menor que con ventanas periodicas (1.18 nm)",
+  "type": "data"
+ },
+ "open-21": {
+  "detail": "state.json claims[21] (status=refuted, ronda 1, verifier)",
+  "reproduce": "equipo/2026-09-28_review-pminflux-sim/state.json",
+  "statement": "F111-comentarios: 'los comentarios de paridad estan invertidos' — en la rama sin centro son correctos; en la rama con centro solo son incorrectos si K se lee como el total de haces (son correctos para Ktheta=K-1)",
+  "type": "data"
+ },
+ "open-26": {
+  "detail": "state.json claims[26] (status=unclear, ronda 1, verifier)",
+  "reproduce": "equipo/2026-09-28_review-pminflux-sim/state.json",
+  "statement": "F154 (descartado): se confirma el ValueError cuando M_p no es multiplo de cycle_time/dt; no reproduje el 88.5 % en la ventana 0 ni el chi2 p=0.74 con el haz recuperado del macrotiempo",
+  "type": "data"
+ },
+ "open-28": {
+  "detail": "state.json claims[28] (status=unclear, ronda 1, verifier)",
+  "reproduce": "equipo/2026-09-28_review-pminflux-sim/state.json",
+  "statement": "AUTORIA F101-F111: no se puede verificar; no hay historial git (tampoco en GithubPRO/p-minflux-main). Solo se sostiene el docstring [Lars] de ebp_centres y que el comentario 'EXACTAMENTE' y el fast path estan en el espanol de la autora",
+  "type": "data"
+ },
+ "open-32": {
+  "detail": "state.json claims[32] (status=unclear, ronda 1, verifier)",
+  "reproduce": "equipo/2026-09-28_review-pminflux-sim/state.json",
+  "statement": "F201: la clase CONCEPTUAL — con el criterio del PI (parámetro o supuesto no declarado) corresponde DISENO, y lo conceptual ya es F104. Además hay que acreditar que la autora anotó 'IRF y lifetime medidos' como pendiente (ESTADO_Y_PLAN_REALISMO_PSF.md:115-117) y que el 2.75 es respecto del CRB sin fuga (el CRB con fuga es 0.945 nm, cociente ≈2.5). Decide el PI",
+  "type": "data"
+ },
+ "open-34": {
+  "detail": "state.json claims[34] (status=refuted, ronda 1, verifier)",
+  "reproduce": "equipo/2026-09-28_review-pminflux-sim/state.json",
+  "statement": "F202 clase IMPLEMENTACION — el docstring (realistic_ebp.py:5-6) declara unidades relativas al máximo de cada PSF, así que el código hace lo que dice; con el criterio del PI es DISENO. Además el supuesto 'el máximo del .npy = potencia del haz' tiene que figurar en el hallazgo (hoy solo está en el reporte; lo apoya que el orden de los máximos se repite en 3 calibraciones), y hay que acreditar que ella ya recomendó 'permitir distinta potencia entre haces' (ESTADO…md:116)",
+  "type": "data"
+ },
+ "open-36": {
+  "detail": "state.json claims[36] (status=refuted, ronda 1, verifier)",
+  "reproduce": "equipo/2026-09-28_review-pminflux-sim/state.json",
+  "statement": "F203: 'el 100 % de las estimaciones ingenuas (sustituto) queda en el borde para los cuatro R' — con R=1.25·L es el 71–72 % (sus propios datos en w3/F203_out.json y los míos); vale para R ≤ 1.0·L. Con el R de ella (0.75) y el EBP realista, el ingenuo solo tiene un 1 % en el borde",
+  "type": "data"
+ },
+ "open-56": {
+  "detail": "state.json claims[56] (status=refuted, ronda 2, code-reviewer)",
+  "reproduce": "equipo/2026-09-28_review-pminflux-sim/state.json",
+  "statement": "Robustez del estimador y del CRB con b > T/K no está garantizada ni avisada: con b=20, r0=(-15,15) y datos v2sim N=2095, mle_mixing (grid_step por defecto) cae en un óptimo local equivocado en 193/300 locs (16.7 nm de error medio) con converged=True y n_failed=0, e incluso con conteos exactos devuelve (-13.5, 41.0); con b=30 RMSE/CRB=0.575 (CRB multinomial inválida con ventanas solapadas). Sin guard en simulate/crb/mle_mixing",
+  "type": "data"
+ },
+ "open-57": {
+  "detail": "state.json claims[57] (status=unclear, ronda 2, code-reviewer)",
+  "reproduce": "equipo/2026-09-28_review-pminflux-sim/state.json",
+  "statement": "Rendimiento: el arranque en grilla del MLE no está partido en bloques (359 MB con 1e5 locs, ~3.6 GB con 1e6; free_powers lo repite en cada evaluación); el punto fijo del tiempo muerto es O(n^2) a saturación (d=500 ns, 0.3/ciclo: 13.3 s y 448 MB para 1e6 fotones). Bien a las tasas del tracking",
+  "type": "data"
+ },
+ "open-58": {
+  "detail": "state.json claims[58] (status=unclear, ronda 2, code-reviewer)",
+  "reproduce": "equipo/2026-09-28_review-pminflux-sim/state.json",
+  "statement": "Tests débiles: test_compare_json_complete no exige source==v2sim ni sha256 actuales; F204 solo comprueba SE>0; el caso none de test_low_rate pasa con p=0.0018 contra el umbral 1e-3 (con 10 semillas juntas p=0.11: es una fluctuación, pero frágil); los ceros de F102 se comprueban con la misma fórmula del código",
+  "type": "data"
+ },
+ "open-59": {
+  "detail": "state.json claims[59] (status=unclear, ronda 2, code-reviewer)",
+  "reproduce": "equipo/2026-09-28_review-pminflux-sim/state.json",
+  "statement": "El modelo directo del estimador no incluye la distorsión de TCSPC y tiempo muerto a tasa finita: el sesgo de la mezcla llega a ~4 SE (0.098 nm) en el estudio v2sim; documentado, no es un bug; la hipótesis de W2 'd = n*T anula el sesgo' no está verificada",
+  "type": "data"
+ },
+ "open-6": {
+  "detail": "state.json claims[6] (status=refuted, ronda 1, verifier)",
+  "reproduce": "equipo/2026-09-28_review-pminflux-sim/state.json",
+  "statement": "MIX-NDETECT: 'de 1e-3 a 5e-3 hacen falta 3e7-2.6e8 fotones para detectar el sesgo' — a 5e-3 se detecto con 1.2e7 fotones (mezcla p=4.6e-4, 'highest' p=0.76); N escala ~1/tasa^2, asi que en 5e-3 bastan ~1e7 (3e7 corresponde a 3e-3)",
+  "type": "data"
+ },
+ "open-60": {
+  "detail": "state.json claims[60] (status=unclear, ronda 2, code-reviewer)",
+  "reproduce": "equipo/2026-09-28_review-pminflux-sim/state.json",
+  "statement": "Docstring de estimate: 'con free_bg local el CRB crece mucho' contradice los datos propios (1.000-1.038x). Con N baja el 1.3% sale converged=False aunque está en el óptimo (dNLL<=1e-6)",
+  "type": "data"
+ },
+ "open-61": {
+  "detail": "state.json claims[61] (status=unclear, ronda 2, code-reviewer)",
+  "reproduce": "equipo/2026-09-28_review-pminflux-sim/state.json",
+  "statement": "Usabilidad como reemplazo: faltan README, ejemplo de punta a punta, notas de migración legado->v2, __init__.py desactualizado (no expone simulate/estimate/psf), empaquetado, una función pública para contar microtiempos reales en ventanas, y el port de F107; report/index.html ausente (aceptación en rojo). Obligatorio en R3",
+  "type": "data"
+ },
+ "open-67": {
+  "detail": "state.json claims[67] (status=refuted, ronda 2, verifier)",
+  "reproduce": "equipo/2026-09-28_review-pminflux-sim/state.json",
+  "statement": "W2-R2 'el valor esperado del doble conteo con b=13, tau=4.21 es 11.15 %' (referencia del test) — el exacto es 11.175 % (cuadratura propia 0.111746; MC propio 1.05e8 fotones 11.173±0.003 %; v2 1.05e7 fotones 11.174±0.010 %, sin sesgo); el 11.11 % reportado es la semilla 51 (8.4e5 fotones, -1.9 SE). Error menor de 0.025 puntos; el test pasa igual",
+  "type": "data"
+ },
+ "open-76": {
+  "detail": "state.json claims[76] (status=refuted, ronda 2, verifier)",
+  "reproduce": "equipo/2026-09-28_review-pminflux-sim/state.json",
+  "statement": "W3-R2 'el sesgo MC del MLE de mezcla en v2sim coincide con el sesgo implícito de las fracciones, así que no viene del estimador; <=0.11 nm' — el sesgo inducido por la tasa finita es ~0.02-0.035 nm (primer orden y MC con 20000 locs: +0.02 nm en x frente a multinomial); en (0,-30) SBR21 el MLE tiene by=-0.036±0.011 nm también con datos multinomiales puros (sesgo O(1/N) del MLE a N~2000, no un bug); el 0.092±0.023 de (20,0) SBR6 es ~0.03 real más una fluctuación de 2.6 sigma. La cota <=0.11 nm es verdadera pero ~3 veces holgada; todo es <=0.03 CRB",
+  "type": "data"
+ },
+ "open-82": {
+  "detail": "state.json claims[82] (status=unclear, ronda 2, verifier)",
+  "reproduce": "equipo/2026-09-28_review-pminflux-sim/state.json",
+  "statement": "W2-R2 n_mode='poisson' (media/varianza), los intervalos KS del tiempo muerto con d>T, beta libre, la fracción en el borde de F203 y el control cruzado con ts.pos_MINFLUX — sus tests pasan pero no los reproduje por otra ruta",
+  "type": "data"
+ },
+ "open-83": {
+  "detail": "state.json claims[83] (status=unclear, ronda 2, verifier)",
+  "reproduce": "equipo/2026-09-28_review-pminflux-sim/state.json",
+  "statement": "W2-R2 'highest reproduce sim_exp' con fondo a tasa alta — v2 fija el SBR incidente y recorta la señal registrada por (1-e^-x)/x, mientras sim_exp fija Ns:Nb registrados; a 0.0105/ciclo es 0.5 % del SBR (despreciable) y a 0.3/ciclo con fondo ~14 %; los tests de highest usan sbr=inf. Falta decidir si se documenta como limitación",
+  "type": "data"
+ },
+ "pi-next": {
+  "detail": "sección 'LO QUE MÁS SE PODRÍA HACER'",
+  "reproduce": "equipo/2026-09-28_review-pminflux-sim/reports/r03-pi.md",
+  "statement": "Lista de próximos pasos del PI (r03)",
+  "type": "source"
+ },
+ "r3-worker-1-0": {
+  "detail": "bloque claims de equipo/2026-09-28_review-pminflux-sim/reports/r03-worker-1.md, entrada 0 (auto-reportada, sin verificar)",
+  "reproduce": "equipo/2026-09-28_review-pminflux-sim/reports/r03-worker-1.md",
+  "statement": "W1-R3 guard b>T/K: simulate_counts, crb, mle_mixing y count_windows levantan ValueError 'ventanas solapadas' con b=20,T=50,K=4; con allow_overlap=True emiten UserWarning y siguen; b=T/K no avisa",
+  "type": "source"
+ },
+ "r3-worker-1-1": {
+  "detail": "bloque claims de equipo/2026-09-28_review-pminflux-sim/reports/r03-worker-1.md, entrada 1 (auto-reportada, sin verificar)",
+  "reproduce": "equipo/2026-09-28_review-pminflux-sim/reports/r03-worker-1.md",
+  "statement": "W1-R3 compare_legacy_vs_v2.json regenerado con el código R3 (semilla 20260928): 0 diferencias numéricas contra el de R2; sha256 de simulate/estimate actuales; test_compare_json_complete exige v2sim y sha",
+  "type": "source"
+ },
+ "r3-worker-1-2": {
+  "detail": "bloque claims de equipo/2026-09-28_review-pminflux-sim/reports/r03-worker-1.md, entrada 2 (auto-reportada, sin verificar)",
+  "reproduce": "equipo/2026-09-28_review-pminflux-sim/reports/r03-worker-1.md",
+  "statement": "W1-R3 count_windows reproduce exactamente los counts de simulate_counts desde return_tags; a 1e-4/ciclo chi2 contra window_probs p=0.184 (394059 fotones)",
+  "type": "source"
+ },
+ "r3-worker-1-3": {
+  "detail": "bloque claims de equipo/2026-09-28_review-pminflux-sim/reports/r03-worker-1.md, entrada 3 (auto-reportada, sin verificar)",
+  "reproduce": "equipo/2026-09-28_review-pminflux-sim/reports/r03-worker-1.md",
+  "statement": "W1-R3 arranque en grilla por bloques (chunk) da r/converged/beta/powers idénticos bit a bit",
+  "type": "source"
+ },
+ "r3-worker-1-4": {
+  "detail": "bloque claims de equipo/2026-09-28_review-pminflux-sim/reports/r03-worker-1.md, entrada 4 (auto-reportada, sin verificar)",
+  "reproduce": "equipo/2026-09-28_review-pminflux-sim/reports/r03-worker-1.md",
+  "statement": "W1-R3 converged: con N=10-50 (6000 locs) converged=False baja de 43 a 5 sin cambiar las estimaciones; los 5 restantes están a 1e-5-2e-5 de NLL y 0.03-0.10 nm del óptimo",
+  "type": "source"
+ },
+ "r3-worker-1-5": {
+  "detail": "bloque claims de equipo/2026-09-28_review-pminflux-sim/reports/r03-worker-1.md, entrada 5 (auto-reportada, sin verificar)",
+  "reproduce": "equipo/2026-09-28_review-pminflux-sim/reports/r03-worker-1.md",
+  "statement": "W1-R3 F107 portado: con t_mask=0 en la mitad y sin fondo, 0 fotones de señal en la mitad apagada; con SBR 5 la fracción apagada es 0.1429 (1/7)",
+  "type": "source"
+ },
+ "r3-worker-1-6": {
+  "detail": "bloque claims de equipo/2026-09-28_review-pminflux-sim/reports/r03-worker-1.md, entrada 6 (auto-reportada, sin verificar)",
+  "reproduce": "equipo/2026-09-28_review-pminflux-sim/reports/r03-worker-1.md",
+  "statement": "W1-R3 study_v2 (N=2095): mezcla con P conocidas máx|b| 0.117 (ideal) / 0.086 nm (desalineada), RMSE/CRB 0.996/1.003; legado 3.116/3.176 nm, 1.671/1.726; ingenuo desalineado 8.583 nm, 4.093; runtime 45.4 s",
+  "type": "source"
+ },
+ "r3-worker-1-7": {
+  "detail": "bloque claims de equipo/2026-09-28_review-pminflux-sim/reports/r03-worker-1.md, entrada 7 (auto-reportada, sin verificar)",
+  "reproduce": "equipo/2026-09-28_review-pminflux-sim/reports/r03-worker-1.md",
+  "statement": "W1-R3 potencias libres sesgadas por parámetros incidentales: N=400 desalineada P/P0 0.847/1.160/1.188 con 1600 locs/pos contra 0.792/1.092/1.088",
+  "type": "source"
+ },
+ "r3-worker-1-8": {
+  "detail": "bloque claims de equipo/2026-09-28_review-pminflux-sim/reports/r03-worker-1.md, entrada 8 (auto-reportada, sin verificar)",
+  "reproduce": "equipo/2026-09-28_review-pminflux-sim/reports/r03-worker-1.md",
+  "statement": "W1-R3 findings.json: 16 ids iguales, todos verified, 19 v2_test(s) existen; F205 dice 0.912 correcto y 0.960 inflado por 0.4455 nm",
+  "type": "source"
+ },
+ "r3-worker-1-9": {
+  "detail": "bloque claims de equipo/2026-09-28_review-pminflux-sim/reports/r03-worker-1.md, entrada 9 (auto-reportada, sin verificar)",
+  "reproduce": "equipo/2026-09-28_review-pminflux-sim/reports/r03-worker-1.md",
+  "statement": "W1-R3 discover -s tests: 64 tests OK en 61.8 s; sha256 de test_acceptance.py intacto",
+  "type": "source"
+ },
+ "rate-sweep": {
+  "detail": "results/mixing_rate_sweep.json: points[*], studies_config; verificado por MIX-HIGHEST, MIX-STUDY, MIX-TRACKING",
+  "json_file": "results/mixing_rate_sweep.json",
+  "reproduce": "scripts/validate_mixing_matrix.py",
+  "statement": "Barrido de tasa de sim_exp contra la mezcla y los predictores highest/earliest (results/mixing_rate_sweep.json)",
+  "type": "script"
+ },
+ "readme": {
+  "detail": "sha256 4949a5d5839220b875afedb8454f310ae7b3423be8a2ddedae5d51a7cd350f17",
+  "reproduce": "README.md",
+  "statement": "README de pminflux_sim (instalación, convenciones, supuestos, migración)",
+  "type": "data"
+ }
+}

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Registro de hallazgos fusionado y corregido (ronda 2, Worker 1).
+"""Registro de hallazgos fusionado y corregido (ronda 2, Worker 1; actualizado en R3).
 
 Lee ``results/findings_A.json``, ``results/findings_B.json`` (borradores de R1) y el ledger
 ``equipo/2026-09-28_review-pminflux-sim/state.json`` (solo lectura) y escribe:
@@ -92,6 +92,19 @@ def C(frm, to, src):
 
 T_SIM = "tests/test_simulate.py::"
 T_EST = "tests/test_estimate.py::"
+T_WIN = "tests/test_windows.py::"
+T_USE = "tests/test_usability.py::"
+
+
+def refresh_fix_status(txt):
+    """R3: 'pendiente R2 (Wn): X. Test fijado, aún no verificado.' -> estado real después de R2.
+
+    En R2 el verificador comprobó que los v2_test existen y pasan (state.json, r02-verifier.md).
+    """
+    txt = re.sub(r"^pendiente R2 \(([^)]*)\): ", r"implementado en v2 (R2, \1): ", txt)
+    txt = re.sub(r" Tests? fijados?, aún no verificados?\.$",
+                 " El test v2 existe y pasa (verificado en R2).", txt)
+    return txt
 
 
 def findings_spec():
@@ -299,8 +312,12 @@ def findings_spec():
                        "por factorización, F152) y ~100 veces más rápida; el comentario de l.473 "
                        "('only for cw_minflux / non-fast path') deja a la vista que la máscara solo se "
                        "aplica en la otra ruta.",
-        v2_test=None, v2_tests=[],
-        v2_fix_status="no portado a v2: t_mask/blinking queda en el backlog (sin asignar en R2).",
+        v2_test=T_SIM + "TestSimulateBlinking::test_t_mask_blinking_F107",
+        v2_tests=[T_SIM + "TestSimulateBlinking::test_t_mask_blinking_F107"],
+        v2_fix_status="portado en R3 (W1): simulate_counts(..., t_mask=M ciclos 0/1, extensión "
+                      "periódica); en un ciclo apagado no hay fotones de señal (el fondo sigue). "
+                      "Con t_mask = 0 en la primera mitad y sin fondo, 0 fotones en la mitad apagada "
+                      "(el legado: 51.35 %). Pendiente de verificación en R3.",
         corrections=[
             C("51.4 %", "51.35 %", VA + " (state.json F107)"),
             C("'cw_minflux con la misma máscara: 0'",
@@ -459,9 +476,12 @@ def findings_spec():
                        "(F290-D7). Ella ya anotó como extensión pendiente 'incorporar drift, blinking, "
                        "IRF y lifetime medidos' (ESTADO_Y_PLAN_REALISMO_PSF.md:115-117).",
         v2_test=T_SIM + "TestSimulateLegacy::test_short_lifetime_turns_off_leakage",
-        v2_tests=[T_SIM + "TestSimulateLegacy::test_short_lifetime_turns_off_leakage"],
+        v2_tests=[T_SIM + "TestSimulateLegacy::test_short_lifetime_turns_off_leakage",
+                  T_USE + "TestStudyV2::test_study_v2_json"],
         v2_fix_status="pendiente R2 (W2/W3): el comparativo legado contra v2 corre con τ = 4.21 y "
-                      "[0, 10.1]; repetir el estudio de desalineación con v2 queda opcional para R3.",
+                      "[0, 10.1]. R3: el estudio de desalineación y de eficiencia se rehízo con v2 en "
+                      "el setup medido (scripts/study_misalignment_v2.py -> results/study_v2.json; "
+                      "pendiente de verificación en R3).",
         corrections=[
             C("clase CONCEPTUAL", "DISENO", INBOX_R2 + " (recomendación de " + VB + ")"),
             C("RMSE/CRB 2.75 (CRB 0.864 nm); título '~2.9 nm (3.4 CRB) y RMSE/CRB 2.75'",
@@ -627,7 +647,9 @@ def findings_spec():
                "contra R0 y 0.67 contra el píxel: el orden honesto/ingenuo se invierte según la "
                "referencia. La diferencia vectorial (−0.35, 0.56) nm no depende de la referencia. "
                "Impacto extra: el RMSE de la escalera también se calcula contra R0 "
-               "(analyze_realistic_psf.py:88) y pasa de 0.912 a 0.960 nm en el ideal. run_final.log "
+               "(analyze_realistic_psf.py:88). En el ideal el RMSE correcto, contra el píxel "
+               "realmente simulado (−5, −8), es 0.912 nm; los 0.960 nm que produce el script legado "
+               "están inflados por el desplazamiento de 0.4455 nm. run_final.log "
                "(r0 = (5,−5), entero) no está afectado.",
         author="autora",
         author_basis=BASIS_AUTORA + ". Ella cambió R0_NM a la localización experimental no entera "
@@ -637,13 +659,20 @@ def findings_spec():
                        "el mismo r0 y la misma grilla en todos los casos, así que las diferencias "
                        "vectoriales entre casos son correctas.",
         v2_test=T_EST + "TestEstimate::test_continuous_offgrid_no_quantization",
-        v2_tests=[T_EST + "TestEstimate::test_continuous_offgrid_no_quantization"],
+        v2_tests=[T_EST + "TestEstimate::test_continuous_offgrid_no_quantization",
+                  T_USE + "TestStudyV2::test_study_v2_json"],
         v2_fix_status="pendiente R2 (W3): emisor con λ en r continuo y sesgo contra la posición "
-                      "simulada. Test fijado, aún no verificado.",
+                      "simulada. Test fijado, aún no verificado. R3: scripts/study_misalignment_v2.py "
+                      "simula emisores continuos y mide contra la posición simulada "
+                      "(results/study_v2.json).",
         corrections=[
             C("sin el impacto en el RMSE",
               "impacto extra: RMSE de la escalera 0.912 → 0.960 nm (analyze_realistic_psf.py:88)",
               VB + " (state.json F205) + " + INBOX_R2),
+            C("'pasa de 0.912 a 0.960 nm en el ideal'",
+              "0.912 nm es el RMSE correcto (contra el píxel simulado (−5, −8)); 0.960 nm es lo que "
+              "produce el script legado, inflado por el desplazamiento de 0.4455 nm",
+              "r02-verifier.md (F205, sentido resuelto) + r03-pi.md"),
             C("|b| 0.437 / 0.012 (ideal), 0.302 / 0.663 (geom ingenua); título '0.445 nm'",
               "0.43 / 0.02 y 0.31 / 0.67; 0.4455 nm", VB + " (state.json F205)"),
             C("'los honest_bias_nm de comparison_metrics.csv (0.434 … 0.519) son casi enteramente "
@@ -713,7 +742,7 @@ def build_findings(state, drafts):
             "corrections_applied": s["corrections"],
             "v2_test": s["v2_test"],
             "v2_tests": s["v2_tests"],
-            "v2_fix_status": s["v2_fix_status"],
+            "v2_fix_status": refresh_fix_status(s["v2_fix_status"]),
             "crimen_inverso": fid in ("F104", "F201"),
             "draft_source": "results/findings_%s.json (R1, borrador)" % s["src"],
         }

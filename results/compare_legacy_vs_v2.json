@@ -2433,15 +2433,15 @@
   "sha256": {
    "mixing": "e3acbbd24c53c29201e7a8b779323bd3f3ca4080d61954775535e7c74c7c2f3e",
    "psf": "03b2d894ac2cecbab242b85ddeb2da41e135d978201dac05272bdb8a4d8831f1",
-   "estimate": "bab4072edebad68f72c31fd0ed97ad90710b7932d19202f6e75699ad04fbc203",
-   "simulate": "68a1b32695bf7471e865e02b198bb1a8c6e54ef2ffcfeed211ec52067493cda8",
+   "estimate": "6c3f9591e77e6ed9b9b2fd7a025ae72c2c250558504f3c2120a7767974d7704c",
+   "simulate": "fb77ec32b390931c1b6747899a7bfb10b69bac50aadf3298aa6fad6b73df6761",
    "compare_legacy_vs_v2": "8013b7932949c7fc9b81a593e7d537467c454ad966948dfda928bbdc72d84e2c"
   }
  },
  "command": "scripts/compare_legacy_vs_v2.py",
  "runtime_s": {
-  "total": 53.24728226661682,
-  "simulation": 36.43445444107056,
-  "estimation": 14.916550874710083
+  "total": 61.73311376571655,
+  "simulation": 42.92346501350403,
+  "estimation": 16.856911659240723
  }
 }

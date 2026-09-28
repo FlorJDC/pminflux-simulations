@@ -10,6 +10,7 @@ import os
 import sys
 import time
 import unittest
+import warnings
 
 import numpy as np
 from scipy import stats
@@ -154,11 +155,15 @@ class TestSimulateLegacy(unittest.TestCase):
         #   b = 13: cuenta dos veces 10.9 % (tau = 4.21, MC de sim_exp) / 94.9 % (tau = 0.001);
         #   a = -0.5, b = 12.5: la ventana 0 pierde 6.84 % (4.21) / 2.54 % (0.001) (esperado).
         # El 10.9 % del verificador es un MC de 62850 fotones (SE 0.12 puntos); el valor esperado
-        # analítico propio es 11.15 %: se usa ese con tolerancia de MC.
-        for tau, dbl_ref, loss_ref, seed in [(4.21, 0.1115, 0.0684, 51), (0.001, 0.949, 0.0254, 52)]:
+        # analítico es 11.175 % (cuadratura 0.111746, verificador R2): se usa ese con tolerancia de MC.
+        # b = 13 > T/K solapa ventanas: hace falta allow_overlap=True (avisa con warnings.warn).
+        for tau, dbl_ref, loss_ref, seed in [(4.21, 0.11175, 0.0684, 51), (0.001, 0.949, 0.0254, 52)]:
             common = dict(tau=tau, irf_fwhm=0.0, tcspc="none", rate_per_cycle=0.0105)
-            p = sm.SimParams(counting="legacy", a=0.0, b=13.0, **common)
-            c, tags = sm.simulate_counts(LAM55, 400, 2095, SBR21, p, _rng(seed), return_tags=True)
+            p = sm.SimParams(counting="legacy", a=0.0, b=13.0, allow_overlap=True, **common)
+            with warnings.catch_warnings(record=True) as w:
+                warnings.simplefilter("always")
+                c, tags = sm.simulate_counts(LAM55, 400, 2095, SBR21, p, _rng(seed), return_tags=True)
+            self.assertTrue(any("ventanas solapadas" in str(x.message) for x in w))
             n = tags["microtime_ns"].size
             dbl = c.sum() / n - 1.0          # a = 0: los ceros no entran (desigualdad estricta)
             se = math.sqrt(dbl * (1 - dbl) / n)
@@ -276,8 +281,11 @@ class TestSimulateBackground(unittest.TestCase):
     def test_background_uniform_b_over_T(self):
         # Solo fondo: cada ventana recibe la fracción b/T de los detectados (también plegada/cruzando T).
         for a, b, seed in [(0.0, 10.1, 91), (-3.0, 15.0, 92), (4.0, 12.5, 93)]:
-            p = sm.SimParams(a=a, b=b, rate_per_cycle=1e-3)
-            c = sm.simulate_counts(LAM4, 250, 2000, 0.0, p, _rng(seed))
+            # b = 15 > T/K solapa ventanas (R3: requiere allow_overlap=True, que avisa)
+            p = sm.SimParams(a=a, b=b, rate_per_cycle=1e-3, allow_overlap=b > DT)
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore", UserWarning)
+                c = sm.simulate_counts(LAM4, 250, 2000, 0.0, p, _rng(seed))
             n = 250 * 2000
             f = c.sum(axis=0) / n
             z = (f - b / T) / math.sqrt((b / T) * (1 - b / T) / n)
@@ -361,6 +369,43 @@ class TestSimulateAPI(unittest.TestCase):
         q = LAM55 * pw / np.sum(LAM55 * pw)
         self.assertGreater(mx.pearson_chi2(o, q)[2], 1e-3)
         self.assertLess(mx.pearson_chi2(o, LAM55)[2], 1e-6)
+
+
+class TestSimulateBlinking(unittest.TestCase):
+
+    def test_t_mask_blinking_F107(self):
+        # F107 (port R3): en el legado sim_exp('p_minflux') ignoraba t_mask y ponía el 51.35 % de
+        # los fotones en la mitad apagada. En v2 un ciclo apagado no tiene fotones de señal.
+        M = 4000
+        mask = np.r_[np.zeros(M // 2, bool), np.ones(M // 2, bool)]
+        for tcspc, seed in [("earliest", 71), ("highest", 72), ("none", 73)]:
+            p = sm.SimParams(tcspc=tcspc, rate_per_cycle=2.5e-3)
+            c, tags = sm.simulate_counts(LAM55, 40, 500, math.inf, p, _rng(seed), return_tags=True,
+                                         t_mask=mask)
+            off = ~mask[np.mod(np.floor(tags["cycle"]).astype(np.int64), M)]
+            # la cola de un fotón del ciclo M-1 (encendido) puede llegar en el ciclo M = 0 (mod M,
+            # apagado): se admite solo ese borde (tags["cycle"] es el ciclo de LLEGADA)
+            edge = np.mod(tags["cycle"], M) == 0
+            self.assertEqual(int(np.sum(off & ~edge)), 0, tcspc)
+            np.testing.assert_array_equal(np.bincount(tags["loc"], minlength=40), 500)
+        # con fondo (sbr 5): la fracción de fotones en la mitad apagada es la del fondo, 1/7
+        p = sm.SimParams(rate_per_cycle=2.5e-3)
+        _, tags = sm.simulate_counts(LAM55, 200, 1000, 5.0, p, _rng(74), return_tags=True,
+                                     t_mask=mask)
+        f_off = np.mean(~mask[np.mod(tags["cycle"], M)])
+        se = math.sqrt(f_off * (1 - f_off) / tags["cycle"].size)
+        _log("t_mask", photons=tags["cycle"].size, frac_off=round(f_off, 4), ref=round(1 / 7., 4))
+        self.assertLess(abs(f_off - 1 / 7.), 5 * se + 2e-3)
+        # máscara toda encendida = sin máscara, bit a bit (no cambia las extracciones aleatorias)
+        c0 = sm.simulate_counts(LAM55, 30, 300, SBR21, sm.SimParams(), _rng(75))
+        c1 = sm.simulate_counts(LAM55, 30, 300, SBR21, sm.SimParams(), _rng(75),
+                                t_mask=np.ones(17, bool))
+        np.testing.assert_array_equal(c0, c1)
+        for bad in [np.zeros((2, 3)), np.zeros(0), np.array([0, 2, 1])]:
+            with self.assertRaises(ValueError):
+                sm.simulate_counts(LAM55, 2, 10, 5.0, sm.SimParams(), _rng(1), t_mask=bad)
+        with self.assertRaises(ValueError):
+            sm.simulate_counts(LAM55, 2, 10, math.inf, sm.SimParams(), _rng(1), t_mask=np.zeros(5))
 
 
 class TestSimulateSpeed(unittest.TestCase):

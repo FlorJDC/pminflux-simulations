@@ -35,7 +35,7 @@
    "tests/test_simulate.py::TestSimulateLegacy::test_highest_overwrite_emulation (antes)",
    "tests/test_simulate.py::TestSimulateTCSPC::test_earliest_matches_mixing_predictor (después)"
   ],
-  "v2_fix_status": "pendiente R2 (W2): simulate.py con tcspc='earliest' y tiempo muerto; tcspc='highest' emula el legado. Test fijado, aún no verificado.",
+  "v2_fix_status": "implementado en v2 (R2, W2): simulate.py con tcspc='earliest' y tiempo muerto; tcspc='highest' emula el legado. El test v2 existe y pasa (verificado en R2).",
   "crimen_inverso": false,
   "draft_source": "results/findings_A.json (R1, borrador)"
  },
@@ -70,7 +70,7 @@
    "tests/test_simulate.py::TestSimulateLegacy::test_legacy_counting_zeros_in_window0 (antes y después)",
    "tests/test_simulate.py::TestSimulateMixing::test_irf_negative_start_and_wrap (corrección)"
   ],
-  "v2_fix_status": "pendiente R2 (W2): counting='periodic' sin ceros; counting='legacy' reproduce el defecto. Test fijado, aún no verificado.",
+  "v2_fix_status": "implementado en v2 (R2, W2): counting='periodic' sin ceros; counting='legacy' reproduce el defecto. El test v2 existe y pasa (verificado en R2).",
   "crimen_inverso": false,
   "draft_source": "results/findings_A.json (R1, borrador)"
  },
@@ -115,7 +115,7 @@
    "tests/test_simulate.py::TestSimulateLegacy::test_legacy_counting_non_periodic (antes y después)",
    "tests/test_simulate.py::TestSimulateMixing::test_irf_negative_start_and_wrap (corrección)"
   ],
-  "v2_fix_status": "pendiente R2 (W2): ventanas plegadas módulo T (counting='periodic'). Test fijado, aún no verificado.",
+  "v2_fix_status": "implementado en v2 (R2, W2): ventanas plegadas módulo T (counting='periodic'). El test v2 existe y pasa (verificado en R2).",
   "crimen_inverso": false,
   "draft_source": "results/findings_A.json (R1, borrador)"
  },
@@ -161,7 +161,7 @@
    "tests/test_estimate.py::TestEstimate::test_mixing_mle_unbiased_at_measured_setup (después)",
    "tests/test_simulate.py::TestSimulateMixing::test_low_rate_matches_mixing_window_probs (modelo directo correcto)"
   ],
-  "v2_fix_status": "pendiente R2 (W2/W3): simulador con fuga y estimador con matriz de mezcla C y fondo b/T. Tests fijados, aún no verificados.",
+  "v2_fix_status": "implementado en v2 (R2, W2/W3): simulador con fuga y estimador con matriz de mezcla C y fondo b/T. El test v2 existe y pasa (verificado en R2).",
   "crimen_inverso": true,
   "draft_source": "results/findings_A.json (R1, borrador)",
   "crimen_inverso_note": "Crimen inverso: los estudios simulan con el mismo modelo directo que usa el estimador (sin fuga entre pulsos y con ventanas que cubren el ciclo: Tlife = 0.001 ns, b = dt/K). En ese régimen la Ec. 3.5 es exacta y el MLE alcanza el CRB, así que la simulación no puede detectar el desajuste de modelo que aparece con τ = 4.21 ns y la ventana [0, 10.1] ns medidos (F104). F201 es la otra mitad: el mismo supuesto aplicado a los estudios."
@@ -191,7 +191,7 @@
   "v2_tests": [
    "tests/test_estimate.py::TestEstimate::test_continuous_offgrid_no_quantization"
   ],
-  "v2_fix_status": "pendiente R2 (W3): λ evaluado en r continuo y MLE continuo acotado. Test fijado, aún no verificado.",
+  "v2_fix_status": "implementado en v2 (R2, W3): λ evaluado en r continuo y MLE continuo acotado. El test v2 existe y pasa (verificado en R2).",
   "crimen_inverso": false,
   "draft_source": "results/findings_A.json (R1, borrador)"
  },
@@ -226,9 +226,11 @@
     "source": "r02-pi.md defaults"
    }
   ],
-  "v2_test": null,
-  "v2_tests": [],
-  "v2_fix_status": "no portado a v2: t_mask/blinking queda en el backlog (sin asignar en R2).",
+  "v2_test": "tests/test_simulate.py::TestSimulateBlinking::test_t_mask_blinking_F107",
+  "v2_tests": [
+   "tests/test_simulate.py::TestSimulateBlinking::test_t_mask_blinking_F107"
+  ],
+  "v2_fix_status": "portado en R3 (W1): simulate_counts(..., t_mask=M ciclos 0/1, extensión periódica); en un ciclo apagado no hay fotones de señal (el fondo sigue). Con t_mask = 0 en la primera mitad y sin fondo, 0 fotones en la mitad apagada (el legado: 51.35 %). Pendiente de verificación en R3.",
   "crimen_inverso": false,
   "draft_source": "results/findings_A.json (R1, borrador)"
  },
@@ -257,7 +259,7 @@
   "v2_tests": [
    "tests/test_estimate.py::TestEstimate::test_cov_ellipse_orientation"
   ],
-  "v2_fix_status": "pendiente R2 (W3): cov_ellipse corregido en estimate.py. Test fijado, aún no verificado.",
+  "v2_fix_status": "implementado en v2 (R2, W3): cov_ellipse corregido en estimate.py. El test v2 existe y pasa (verificado en R2).",
   "crimen_inverso": false,
   "draft_source": "results/findings_A.json (R1, borrador)"
  },
@@ -292,7 +294,7 @@
    "tests/test_estimate.py::TestPSF::test_fwhm_honored_and_any_K",
    "tests/test_estimate.py::TestPSF::test_matches_legacy_beams_and_doughnut"
   ],
-  "v2_fix_status": "pendiente R2 (W3): psf.donut(r, fwhm) respeta la fwhm. Test fijado, aún no verificado.",
+  "v2_fix_status": "implementado en v2 (R2, W3): psf.donut(r, fwhm) respeta la fwhm. El test v2 existe y pasa (verificado en R2).",
   "crimen_inverso": false,
   "draft_source": "results/findings_A.json (R1, borrador)"
  },
@@ -326,7 +328,7 @@
   "v2_tests": [
    "tests/test_estimate.py::TestEstimate::test_sbr_inf"
   ],
-  "v2_fix_status": "pendiente R2 (W3): sbr = inf sin NaN. Test fijado, aún no verificado.",
+  "v2_fix_status": "implementado en v2 (R2, W3): sbr = inf sin NaN. El test v2 existe y pasa (verificado en R2).",
   "crimen_inverso": false,
   "draft_source": "results/findings_A.json (R1, borrador)"
  },
@@ -370,7 +372,7 @@
   "v2_tests": [
    "tests/test_estimate.py::TestPSF::test_fwhm_honored_and_any_K"
   ],
-  "v2_fix_status": "pendiente R2 (W3): psf.beam_positions(K, L, center) para K arbitrario. Test fijado, aún no verificado.",
+  "v2_fix_status": "implementado en v2 (R2, W3): psf.beam_positions(K, L, center) para K arbitrario. El test v2 existe y pasa (verificado en R2).",
   "crimen_inverso": false,
   "draft_source": "results/findings_A.json (R1, borrador)"
  },
@@ -422,9 +424,10 @@
   ],
   "v2_test": "tests/test_simulate.py::TestSimulateLegacy::test_short_lifetime_turns_off_leakage",
   "v2_tests": [
-   "tests/test_simulate.py::TestSimulateLegacy::test_short_lifetime_turns_off_leakage"
+   "tests/test_simulate.py::TestSimulateLegacy::test_short_lifetime_turns_off_leakage",
+   "tests/test_usability.py::TestStudyV2::test_study_v2_json"
   ],
-  "v2_fix_status": "pendiente R2 (W2/W3): el comparativo legado contra v2 corre con τ = 4.21 y [0, 10.1]; repetir el estudio de desalineación con v2 queda opcional para R3.",
+  "v2_fix_status": "implementado en v2 (R2, W2/W3): el comparativo legado contra v2 corre con τ = 4.21 y [0, 10.1]. R3: el estudio de desalineación y de eficiencia se rehízo con v2 en el setup medido (scripts/study_misalignment_v2.py -> results/study_v2.json; pendiente de verificación en R3).",
   "crimen_inverso": true,
   "draft_source": "results/findings_B.json (R1, borrador)",
   "crimen_inverso_note": "Crimen inverso: los estudios simulan con el mismo modelo directo que usa el estimador (sin fuga entre pulsos y con ventanas que cubren el ciclo: Tlife = 0.001 ns, b = dt/K). En ese régimen la Ec. 3.5 es exacta y el MLE alcanza el CRB, así que la simulación no puede detectar el desajuste de modelo que aparece con τ = 4.21 ns y la ventana [0, 10.1] ns medidos (F104). F201 es la otra mitad: el mismo supuesto aplicado a los estudios."
@@ -469,7 +472,7 @@
   "v2_tests": [
    "tests/test_estimate.py::TestEstimate::test_free_powers_removes_bias"
   ],
-  "v2_fix_status": "pendiente R2 (W3): mle_mixing(free_powers=True) y beam_powers en simulate. Test fijado, aún no verificado.",
+  "v2_fix_status": "implementado en v2 (R2, W3): mle_mixing(free_powers=True) y beam_powers en simulate. El test v2 existe y pasa (verificado en R2).",
   "crimen_inverso": false,
   "draft_source": "results/findings_B.json (R1, borrador)"
  },
@@ -508,7 +511,7 @@
   "v2_tests": [
    "tests/test_estimate.py::TestEstimate::test_boundary_fraction_reported"
   ],
-  "v2_fix_status": "pendiente R2 (W3): el estimador devuelve la bandera 'en el borde' y el comparativo informa la fracción. Test fijado, aún no verificado.",
+  "v2_fix_status": "implementado en v2 (R2, W3): el estimador devuelve la bandera 'en el borde' y el comparativo informa la fracción. El test v2 existe y pasa (verificado en R2).",
   "crimen_inverso": false,
   "draft_source": "results/findings_B.json (R1, borrador)"
  },
@@ -547,7 +550,7 @@
   "v2_tests": [
    "tests/test_estimate.py::TestCompare::test_compare_json_complete (SE bootstrap)"
   ],
-  "v2_fix_status": "pendiente R2 (W3): el comparativo reporta SE bootstrap de cada métrica. Test fijado, aún no verificado.",
+  "v2_fix_status": "implementado en v2 (R2, W3): el comparativo reporta SE bootstrap de cada métrica. El test v2 existe y pasa (verificado en R2).",
   "crimen_inverso": false,
   "draft_source": "results/findings_B.json (R1, borrador)"
  },
@@ -557,7 +560,7 @@
   "class": "IMPLEMENTACION",
   "legacy_location": "legacy/p-minflux-main/simulation_misalignment.py:67,177,230,256; legacy/p-minflux-main/analyze_realistic_psf.py:36-37,87-88,145-146; núcleo: sim_exp lee psf[:, r0[0], r0[1]] (F106)",
   "scenario": "Casos honestos e ingenuos con N = 2095 y 1e5 muestras (multinomial, equivalente a sim_exp en C0); sesgo medido contra R0_NM y contra el píxel realmente simulado.",
-  "impact": "R0_NM = (−5.07, −7.56) se simula en el píxel (−5, −8), un desplazamiento de 0.4455 nm. El |b| honesto ideal es 0.43 nm contra R0 y 0.02 contra el píxel; con 1000 muestras el SE de |b| es ≈0.04, así que el artefacto está a ~10σ. La geométrica ingenua da 0.31 contra R0 y 0.67 contra el píxel: el orden honesto/ingenuo se invierte según la referencia. La diferencia vectorial (−0.35, 0.56) nm no depende de la referencia. Impacto extra: el RMSE de la escalera también se calcula contra R0 (analyze_realistic_psf.py:88) y pasa de 0.912 a 0.960 nm en el ideal. run_final.log (r0 = (5,−5), entero) no está afectado.",
+  "impact": "R0_NM = (−5.07, −7.56) se simula en el píxel (−5, −8), un desplazamiento de 0.4455 nm. El |b| honesto ideal es 0.43 nm contra R0 y 0.02 contra el píxel; con 1000 muestras el SE de |b| es ≈0.04, así que el artefacto está a ~10σ. La geométrica ingenua da 0.31 contra R0 y 0.67 contra el píxel: el orden honesto/ingenuo se invierte según la referencia. La diferencia vectorial (−0.35, 0.56) nm no depende de la referencia. Impacto extra: el RMSE de la escalera también se calcula contra R0 (analyze_realistic_psf.py:88). En el ideal el RMSE correcto, contra el píxel realmente simulado (−5, −8), es 0.912 nm; los 0.960 nm que produce el script legado están inflados por el desplazamiento de 0.4455 nm. run_final.log (r0 = (5,−5), entero) no está afectado.",
   "fix": "Usar como verdad grid.to_space(r0_idx) (o simular el emisor con λ interpolado en r0 exacto, lo que corrige el núcleo en R2); reportar sesgos como vectores o diferencias pareadas entre casos.",
   "script": "scripts/findings/F205_emitter_snapped_to_pixel.py",
   "status": "verified",
@@ -572,6 +575,11 @@
     "source": "verifier-B r01 (state.json F205) + inbox.jsonl ronda 2"
    },
    {
+    "from": "'pasa de 0.912 a 0.960 nm en el ideal'",
+    "to": "0.912 nm es el RMSE correcto (contra el píxel simulado (−5, −8)); 0.960 nm es lo que produce el script legado, inflado por el desplazamiento de 0.4455 nm",
+    "source": "r02-verifier.md (F205, sentido resuelto) + r03-pi.md"
+   },
+   {
     "from": "|b| 0.437 / 0.012 (ideal), 0.302 / 0.663 (geom ingenua); título '0.445 nm'",
     "to": "0.43 / 0.02 y 0.31 / 0.67; 0.4455 nm",
     "source": "verifier-B r01 (state.json F205)"
@@ -584,9 +592,10 @@
   ],
   "v2_test": "tests/test_estimate.py::TestEstimate::test_continuous_offgrid_no_quantization",
   "v2_tests": [
-   "tests/test_estimate.py::TestEstimate::test_continuous_offgrid_no_quantization"
+   "tests/test_estimate.py::TestEstimate::test_continuous_offgrid_no_quantization",
+   "tests/test_usability.py::TestStudyV2::test_study_v2_json"
   ],
-  "v2_fix_status": "pendiente R2 (W3): emisor con λ en r continuo y sesgo contra la posición simulada. Test fijado, aún no verificado.",
+  "v2_fix_status": "implementado en v2 (R2, W3): emisor con λ en r continuo y sesgo contra la posición simulada. Test fijado, aún no verificado. R3: scripts/study_misalignment_v2.py simula emisores continuos y mide contra la posición simulada (results/study_v2.json).",
   "crimen_inverso": false,
   "draft_source": "results/findings_B.json (R1, borrador)"
  },
@@ -615,7 +624,7 @@
   "v2_tests": [
    "tests/test_estimate.py::TestCompare::test_compare_json_complete (todos los parámetros en el JSON)"
   ],
-  "v2_fix_status": "pendiente R2 (W3): compare_legacy_vs_v2.json registra parámetros, semillas, versión y source. Test fijado, aún no verificado.",
+  "v2_fix_status": "implementado en v2 (R2, W3): compare_legacy_vs_v2.json registra parámetros, semillas, versión y source. El test v2 existe y pasa (verificado en R2).",
   "crimen_inverso": false,
   "draft_source": "results/findings_B.json (R1, borrador)"
  }

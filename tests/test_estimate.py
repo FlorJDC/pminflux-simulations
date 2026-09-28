@@ -443,6 +443,69 @@ def _fd_crb_nuis(pf, th, N):
     return math.sqrt(0.5 * (cov[0, 0] + cov[1, 1]))
 
 
+class TestChunkAndConvergence(unittest.TestCase):
+    """R3: arranque en grilla por bloques (idéntico) y converged=True en el óptimo al agotar maxiter."""
+
+    def test_chunked_grid_start_identical(self):
+        rng = np.random.default_rng(66)
+        c = np.vstack([_multinomial(r0, 40, 95, rng) for r0 in POINTS])       # 200 locs
+        sbr = NS / 95.
+        for kw in (dict(), dict(free_bg=True), dict(free_bg="shared")):
+            a = es.mle_mixing(c, POS, FWHM, C_MEAS, B, T, sbr, R_SEARCH, **kw)
+            b = es.mle_mixing(c, POS, FWHM, C_MEAS, B, T, sbr, R_SEARCH, chunk=7, **kw)
+            np.testing.assert_array_equal(a.r, b.r)
+            np.testing.assert_array_equal(a.converged, b.converged)
+            np.testing.assert_array_equal(a.beta, b.beta)
+        a = es.mle_legacy(c, POS, FWHM, sbr, R_SEARCH)
+        b = es.mle_legacy(c, POS, FWHM, sbr, R_SEARCH, chunk=1)
+        np.testing.assert_array_equal(a.r, b.r)
+        # potencias libres: la grilla se recalcula en cada evaluación del perfil
+        c2 = c[::4]
+        a = es.mle_mixing(c2, POS, FWHM, C_MEAS, B, T, sbr, R_SEARCH, free_powers=True)
+        b = es.mle_mixing(c2, POS, FWHM, C_MEAS, B, T, sbr, R_SEARCH, free_powers=True, chunk=9)
+        np.testing.assert_array_equal(a.r, b.r)
+        np.testing.assert_array_equal(a.powers, b.powers)
+        with self.assertRaises(ValueError):
+            es.mle_mixing(c, POS, FWHM, C_MEAS, B, T, sbr, R_SEARCH, chunk=0)
+
+    def test_converged_flag_at_optimum_low_N(self):
+        # U5 (code-reviewer R2): con N = 10-50, ~0.7 % llegaba a maxiter = 200 con converged=False
+        # estando ya en el óptimo. Ahora: converged=True si la NLL mejoró <= 1e-6 en las últimas
+        # 10 iteraciones. Las estimaciones no cambian (solo el flag).
+        rng = np.random.default_rng(5)
+        cs, sb = [], []
+        for N in (10, 20, 30, 50):
+            for sbr in (math.inf, 5.0, 21.0):
+                r0 = rng.uniform(-30, 30, size=(500, 2))
+                lam = psf.lambda_beams(r0, POS, FWHM)
+                q = lam / lam.sum(1, keepdims=True)
+                beta = es.sbr_to_beta(sbr)
+                e = (1 - beta) * q.dot(C_MEAS.T) + beta * B / T
+                pr = e / e.sum(1, keepdims=True)
+                cs.append(np.array([rng.multinomial(N, pp) for pp in pr]))
+                sb.append(sbr)
+        n_bad = n_at_max = 0
+        for c, sbr in zip(cs, sb):
+            res = es.mle_mixing(c, POS, FWHM, C_MEAS, B, T, sbr, R_SEARCH)
+            n_bad += int(np.sum(~res.converged))
+            hit = np.nonzero(res.n_iter >= 200)[0]
+            n_at_max += hit.size
+            if hit.size:
+                ref = es.mle_mixing(c[hit], POS, FWHM, C_MEAS, B, T, sbr, R_SEARCH, maxiter=5000)
+                gap = res.nll[hit] - ref.nll
+                # los marcados convergidos están a <= 1e-5 del óptimo (y a < 0.05 nm)
+                ok = res.converged[hit]
+                self.assertTrue(np.all(gap[ok] <= 1e-5), gap[ok])
+                self.assertTrue(np.all(np.hypot(*(res.r[hit][ok] - ref.r[ok]).T) < 0.05))
+                # los que siguen converged=False de verdad no llegaron (gap > 1e-6)
+                self.assertTrue(np.all(gap[~ok] > 1e-6), gap[~ok])
+        print("\n[converged_low_N] n=6000 at_maxiter=%d converged_False=%d" % (n_at_max, n_bad))
+        self.assertLessEqual(n_bad, 12)                    # antes 43/6000; ahora 5/6000
+        # con maxiter = 1 desde la grilla no se declara convergencia falsa
+        r1 = es.mle_mixing(cs[-1][:50], POS, FWHM, C_MEAS, B, T, sb[-1], R_SEARCH, maxiter=1)
+        self.assertLess(np.mean(r1.converged), 0.5)
+
+
 class TestCompare(unittest.TestCase):
 
     REQUIRED_EST = ("bias_x", "bias_y", "bias_abs", "sigma_x", "sigma_y", "rmse_2d", "rmse_over_crb")
@@ -493,6 +556,17 @@ class TestCompare(unittest.TestCase):
             self.assertFalse(r["quick"])
             self._check(r, 2)
             self.assertGreaterEqual(r["n_loc"], 2000)
+            # R3: el JSON del repositorio tiene que venir del simulador v2 y del código ACTUAL
+            self.assertEqual(r["source"], "v2sim")
+            self.assertEqual(r["source_requested"], "v2sim")
+            sha = r["versions"]["sha256"]
+            for mod in ("mixing", "psf", "estimate", "simulate"):
+                self.assertEqual(sha[mod], cmp._sha(os.path.join(ROOT, "src", "pminflux_sim",
+                                                                  mod + ".py")),
+                                 "results/compare_legacy_vs_v2.json desactualizado respecto de "
+                                 "%s.py: regenerar con scripts/compare_legacy_vs_v2.py" % mod)
+            self.assertEqual(sha["compare_legacy_vs_v2"],
+                             cmp._sha(os.path.join(ROOT, "scripts", "compare_legacy_vs_v2.py")))
 
 
 if __name__ == "__main__":

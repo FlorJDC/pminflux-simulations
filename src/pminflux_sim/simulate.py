@@ -31,8 +31,11 @@ Reglas de registro (``tcspc``):
 
 Conteo por ventana (``counting``):
 
-- ``"periodic"``: ventana ``i`` = ``[i*T/K + a, i*T/K + a + b]`` plegada módulo ``T`` (se admite
-  ``a < 0`` y cruce de ``T``); el mismo criterio que ``mixing.mixing_matrix``.
+- ``"periodic"``: ventana ``i`` = ``[i*T/K + a, i*T/K + a + b)`` plegada módulo ``T`` (se admite
+  ``a < 0`` y cruce de ``T``); el mismo criterio que ``mixing.mixing_matrix`` y exactamente la
+  misma cuenta que ``windows.count_windows`` sobre los microtiempos de ``return_tags``.
+- Ventanas solapadas (``b > T/K``): ``ValueError`` salvo ``SimParams(allow_overlap=True)``, que
+  solo avisa (``warnings.warn``); la CRB/verosimilitud multinomial dejan de ser válidas.
 - ``"legacy"``: emula ``nMINFLUX`` (F102/F103): desigualdad estricta ``ti < t < tf`` sin pliegue
   (una ventana que cruza ``T`` o empieza antes de 0 pierde lo que cae del otro lado; ventanas que se
   solapan cuentan dos veces) y, como en ``sim_exp``, cada ciclo sin fotón de SEÑAL registrado aporta
@@ -56,6 +59,8 @@ from dataclasses import dataclass
 from typing import Optional, Sequence
 
 import numpy as np
+
+from .windows import check_overlap, window_masks
 
 __all__ = ["SimParams", "simulate_counts", "DEAD_TIME_ASSUMPTION"]
 
@@ -85,6 +90,7 @@ class SimParams:
     counting: str = "periodic"     # "periodic" | "legacy" (nMINFLUX, F102/F103)
     n_mode: str = "fixed"          # "fixed" | "poisson"
     beam_powers: Optional[Sequence[float]] = None   # multiplica lambda (F202); None = iguales
+    allow_overlap: bool = False    # b > T/K: ValueError salvo True (entonces solo warnings.warn)
 
 
 def _check(p):
@@ -94,6 +100,7 @@ def _check(p):
         raise ValueError("T y tau deben ser > 0")
     if not (0 < p.b <= p.T):
         raise ValueError("se necesita 0 < b <= T")
+    check_overlap(p.b, p.T, p.K, p.allow_overlap)
     if not (p.rate_per_cycle > 0):
         raise ValueError("rate_per_cycle debe ser > 0")
     if p.dead_time is None or p.dead_time < 0:
@@ -135,8 +142,15 @@ class _Raw(object):
         self.base, self.arr, self.src, self.cyc = base, arr, src, cyc
 
 
-def _generate(rng, t0, n, q, p, fs, sigma):
-    """n fotones incidentes por fila, continuando el proceso de Poisson desde t0 (ns)."""
+def _generate(rng, t0, n, q, p, fs, sigma, mask=None):
+    """n fotones incidentes por fila, continuando el proceso de Poisson desde t0 (ns).
+
+    ``mask`` (M,) bool: ciclos en que el emisor está encendido (F107), con extensión periódica
+    ``mask[ciclo % M]``. Un fotón de señal excitado en un ciclo apagado se descarta (adelgazamiento
+    exacto de Poisson): queda como "fantasma" (arr = inf, src = -2) que nunca se registra. No
+    cambia las extracciones del generador aleatorio (con ``mask`` = None o todo 1 el resultado es
+    idéntico bit a bit).
+    """
     R = t0.size
     gaps = rng.exponential(p.T / p.rate_per_cycle, size=(R, n))
     base = t0[:, None] + np.cumsum(gaps, axis=1)
@@ -156,6 +170,11 @@ def _generate(rng, t0, n, q, p, fs, sigma):
     dt = p.T / p.K
     arr = np.where(is_sig, cyc * p.T + beam * dt + X, base)
     src = np.where(is_sig, beam, -1)
+    if mask is not None:
+        off = is_sig & ~mask[np.mod(cyc.astype(np.int64), mask.size)]
+        if np.any(off):
+            arr[off] = np.inf
+            src[off] = -2
     return _Raw(base, arr, src, cyc)
 
 
@@ -195,6 +214,12 @@ def _recorded_earliest(arr_sorted, T, dead):
     R, n = arr_sorted.shape
     ninf = np.full((R, 1), -np.inf)
     aval = np.ones((R, n), dtype=bool)
+    with np.errstate(invalid="ignore"):          # fotones fantasma (t_mask): inf - inf
+        return _earliest_loop(arr_sorted, T, dead, ninf, aval, n)
+
+
+def _earliest_loop(arr_sorted, T, dead, ninf, aval, n):
+    """Punto fijo del tiempo muerto (vectorizado; O(n) pasadas en el peor caso, 2-4 en tracking)."""
     prev = None
     for _ in range(n + 1):
         at = np.where(aval, arr_sorted, -np.inf)
@@ -244,34 +269,38 @@ def _pad(x, width, fill):
     return np.concatenate([x, np.full((x.shape[0], width - x.shape[1]), fill, dtype=x.dtype)], axis=1)
 
 
-def _run_rows(rng, raw, q, Nrow, p, fs, sigma, extra):
+def _run_rows(rng, raw, q, Nrow, p, fs, sigma, extra, mask=None):
     """Procesa filas; las que no llegan a N detecciones se extienden (el proceso continúa)."""
     arr, src, rec = _process(raw, p, sigma)
     short = np.nonzero(rec.sum(axis=1) < Nrow)[0]
     if short.size:
         sub = _take_rows(raw, short)
-        add = _generate(rng, sub.base[:, -1].copy(), extra, q[short], p, fs, sigma)
-        a2, s2, r2 = _run_rows(rng, _concat(sub, add), q[short], Nrow[short], p, fs, sigma, 2 * extra)
+        add = _generate(rng, sub.base[:, -1].copy(), extra, q[short], p, fs, sigma, mask)
+        a2, s2, r2 = _run_rows(rng, _concat(sub, add), q[short], Nrow[short], p, fs, sigma,
+                               2 * extra, mask)
         w = a2.shape[1]
         arr, src, rec = _pad(arr, w, np.inf), _pad(src, w, -2), _pad(rec, w, False)
         arr[short], src[short], rec[short] = a2, s2, r2
     return arr, src, rec
 
 
-def _simulate_block(rng, q, Nrow, p, fs, sigma):
+def _simulate_block(rng, q, Nrow, p, fs, sigma, mask=None):
     """Filas de un bloque: devuelve arr, src, take (máscara de las primeras N detecciones)."""
     R = q.shape[0]
     Nmax = int(Nrow.max())
     eff = _efficiency_guess(p, fs)
+    if mask is not None:
+        eff *= max(fs * float(mask.mean()) + (1.0 - fs), 1e-3)
     n0 = int(math.ceil(Nmax / eff * 1.02 + 6.0 * math.sqrt(Nmax + 1) + 8))
-    raw = _generate(rng, np.zeros(R), n0, q, p, fs, sigma)
-    arr, src, rec = _run_rows(rng, raw, q, Nrow, p, fs, sigma, max(64, n0 // 4))
+    raw = _generate(rng, np.zeros(R), n0, q, p, fs, sigma, mask)
+    arr, src, rec = _run_rows(rng, raw, q, Nrow, p, fs, sigma, max(64, n0 // 4), mask)
     rank = np.cumsum(rec, axis=1)
     take = rec & (rank <= Nrow[:, None])
     return arr, src, take
 
 
-def simulate_counts(lambda_beams, n_loc, N, sbr, params=None, rng=None, return_tags=False):
+def simulate_counts(lambda_beams, n_loc, N, sbr, params=None, rng=None, return_tags=False,
+                    t_mask=None):
     """Simula ``n_loc`` localizaciones p-MINFLUX y devuelve los conteos por ventana.
 
     lambda_beams: (K,) o (n_loc, K), excitación relativa (se normaliza por localización después de
@@ -287,9 +316,28 @@ def simulate_counts(lambda_beams, n_loc, N, sbr, params=None, rng=None, return_t
     ``tags`` = dict de arrays planos de los fotones registrados, en orden de llegada por
     localización: ``loc``, ``cycle`` (ciclo de llegada), ``microtime_ns`` en [0, T), ``source``
     (índice de haz, o -1 para el fondo).
+
+    t_mask: None (emisor siempre encendido) o array (M,) de 0/1 (bool): parpadeo del emisor por
+        ciclo, contado desde el ciclo 0 de cada localización y con extensión periódica
+        ``t_mask[ciclo % M]`` (la simulación corre hasta la N-ésima detección, así que el número de
+        ciclos no está fijo). En un ciclo apagado no hay fotones de SEÑAL; el fondo sigue igual
+        (port de F107: en el legado ``sim_exp('p_minflux')`` ignoraba la máscara). La tasa
+        ``rate_per_cycle`` y ``sbr`` se refieren a los ciclos encendidos.
     """
     p = params if params is not None else SimParams()
     _check(p)
+    mask = None
+    if t_mask is not None:
+        tm = np.asarray(t_mask)
+        if tm.ndim != 1 or tm.size == 0:
+            raise ValueError("t_mask debe ser un array 1D no vacío (un valor por ciclo)")
+        if tm.dtype != bool:
+            if not np.all(np.isin(tm, (0, 1))):
+                raise ValueError("t_mask debe ser 0/1 o bool")
+            tm = tm.astype(bool)
+        if not tm.any() and sbr is not None and math.isinf(float(sbr)):
+            raise ValueError("t_mask todo apagado y sin fondo: no hay fotones que detectar")
+        mask = tm
     if rng is None:
         rng = np.random.default_rng()
     elif not isinstance(rng, np.random.Generator):
@@ -320,7 +368,7 @@ def simulate_counts(lambda_beams, n_loc, N, sbr, params=None, rng=None, return_t
         Nrow = Nall[s0:s1]
         if Nrow.max() == 0:
             continue
-        arr, src, take = _simulate_block(rng, q[s0:s1], Nrow, p, fs, sigma)
+        arr, src, take = _simulate_block(rng, q[s0:s1], Nrow, p, fs, sigma, mask)
         R = s1 - s0
         rr, cc = np.nonzero(take)                          # fila-mayor = orden de llegada
         at = arr[rr, cc]
@@ -329,12 +377,9 @@ def simulate_counts(lambda_beams, n_loc, N, sbr, params=None, rng=None, return_t
         micro[micro >= p.T] -= p.T                          # redondeo: microtiempo en [0, T)
         micro[micro < 0] = 0.0
         if p.counting == "periodic":
-            sph = micro - p.a
-            sph -= np.floor(sph / p.T) * p.T                # fase respecto de la ventana 0, [0, T)
+            masks = window_masks(micro, p.T, K, p.a, p.b)   # = windows.count_windows
             for i in range(K):
-                d = sph - i * dt                            # en (-T, T)
-                inw = ((d >= 0) & (d < p.b)) | (d < p.b - p.T)
-                counts[s0:s1, i] = np.bincount(rr[inw], minlength=R)
+                counts[s0:s1, i] = np.bincount(rr[masks[i]], minlength=R)
         else:
             ndet = np.bincount(rr, minlength=R)
             last_idx = np.cumsum(ndet) - 1

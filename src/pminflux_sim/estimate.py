@@ -28,7 +28,9 @@ disco ``|r - center| <= bounds_radius`` y vectorizado sobre localizaciones:
 Estorbos opcionales:
 
 - ``free_bg=True`` (o ``'local'``): ``beta`` libre por localización (3 parámetros; con K = 4 hay
-  3 grados de libertad, así que queda exactamente identificado y el CRB crece mucho).
+  3 grados de libertad, así que queda exactamente identificado). En el setup medido (tau = 4.21,
+  [0, 10.1], SBR 6-21, posiciones de F104) el CRB por eje crece solo 1.000-1.038x (p. ej. 0.9453
+  contra 0.926 nm en (5, -5)): la fuga entre ventanas ayuda a separar fondo de señal.
 - ``free_bg='shared'``: un único ``beta`` para todo el conjunto de localizaciones.
 - ``free_powers=True``: potencias relativas por haz (``P_0 = 1``) compartidas por todo el
   conjunto. **No son identificables con emisores en una sola posición** (con K = 4: 2 + 3
@@ -36,6 +38,18 @@ Estorbos opcionales:
   Los globales se estiman por verosimilitud perfilada (L-BFGS-B sobre los globales; en cada
   evaluación se re-ajustan todas las posiciones, con gradiente exacto por el teorema de la
   envolvente).
+
+Ventanas solapadas (``b > T/K``): ``mle_mixing`` y ``crb`` levantan ``ValueError`` salvo
+``allow_overlap=True`` (solo ``warnings.warn``): con solapamiento un fotón cuenta dos veces y la
+verosimilitud/CRB multinomiales dejan de ser válidas (además el arranque en grilla puede caer en
+un óptimo local equivocado, hallazgo del code-reviewer R2 con b = 20).
+
+``converged``: True si el Fisher scoring terminó por su criterio (paso o mejora relativa de la
+NLL por debajo de la tolerancia, o ningún paso mejora), y también si al agotar ``maxiter`` la NLL
+mejoró <= 1e-6 (absoluto) en las últimas 10 iteraciones (ya está en el óptimo; U5 de R2).
+
+Memoria: el arranque en grilla se calcula en bloques de ``chunk`` localizaciones (default 2e4),
+con resultado idéntico al de un solo bloque.
 
 Convenciones: nm, ns. ``counts`` (n_loc, K) (o (K,)); pueden ser reales (conteos esperados, para
 sesgos asintóticos).
@@ -47,12 +61,16 @@ import numpy as np
 from scipy import optimize, stats
 
 from . import psf as _psf
+from .windows import check_overlap as _check_overlap
 
 __all__ = ["sbr_to_beta", "forward_probs", "legacy_probs", "neg_loglike", "mle_mixing",
            "mle_legacy", "crb", "crb_legacy", "capture_fraction", "cov_ellipse", "MLEResult"]
 
 _P_FLOOR = 1e-300
 _BETA_MAX = 0.999
+_CHUNK = 20000                 # localizaciones por bloque en el arranque en grilla
+_CONV_DNLL = 1e-6              # dNLL absoluto en las últimas 10 iteraciones: en el óptimo
+_CONV_WINDOW = 10
 
 
 def sbr_to_beta(sbr):
@@ -227,6 +245,7 @@ def _fit_local(model, counts, r0, beta0, logpow, center, R, free_beta, maxiter=2
     lp_full = logpow
     p_all = model.probs(r, beta, lp_full)
     f = _nll(counts, p_all)
+    f_hist = [f.copy()]
     for it in range(maxiter):
         idx = np.nonzero(active)[0]
         if idx.size == 0:
@@ -314,13 +333,20 @@ def _fit_local(model, counts, r0, beta0, logpow, center, R, free_beta, maxiter=2
         # sin paso aceptable: es un óptimo local a la precisión de la máquina
         converged[idx[~accepted]] = True
         active[idx[done]] = False
+        f_hist.append(f.copy())
+        if len(f_hist) > _CONV_WINDOW + 1:
+            f_hist.pop(0)
+    # agotó maxiter: si la NLL no mejoró más de 1e-6 en las últimas iteraciones, está en el óptimo
+    left = active & ~converged
+    if np.any(left):
+        converged[left] = (f_hist[0][left] - f[left]) <= _CONV_DNLL
     d = r - center
     on_b = np.hypot(d[:, 0], d[:, 1]) >= R * (1 - 1e-7)
     return r, beta, f, converged, on_b, n_iter
 
 
 def _mle_core(counts, pos, fwhm, C, c, sbr, bounds_radius, center, powers, free_bg,
-              free_powers, kind, x0, grid_step, maxiter):
+              free_powers, kind, x0, grid_step, maxiter, chunk=_CHUNK):
     counts = np.asarray(counts, dtype=float)
     single = counts.ndim == 1
     counts = np.atleast_2d(counts)
@@ -348,10 +374,17 @@ def _mle_core(counts, pos, fwhm, C, c, sbr, bounds_radius, center, powers, free_
     # arranque en grilla
     G = _disk_grid(center, R, grid_step or R / 12.0)
 
+    if chunk is None or int(chunk) < 1:
+        raise ValueError("chunk debe ser un entero >= 1")
+    chunk = int(chunk)
+
     def grid_start(lp_, beta_g):
         pg = model.probs(G, np.full(G.shape[0], beta_g), lp_)
-        L = counts.dot(np.log(np.maximum(pg, _P_FLOOR)).T)          # (n, G)
-        return G[np.argmax(L, axis=1)]
+        lpg = np.log(np.maximum(pg, _P_FLOOR)).T                     # (K, G)
+        best = np.empty(n, dtype=np.int64)
+        for s0 in range(0, n, chunk):                                # (chunk, G) por bloque
+            best[s0:s0 + chunk] = np.argmax(counts[s0:s0 + chunk].dot(lpg), axis=1)
+        return G[best]
 
     if x0 is None:
         r0 = grid_start(lp, beta_init)
@@ -443,29 +476,33 @@ def _mle_core(counts, pos, fwhm, C, c, sbr, bounds_radius, center, powers, free_
 
 def mle_mixing(counts, pos, fwhm, C, b, T, sbr, bounds_radius, center=(0.0, 0.0), powers=None,
                free_bg=False, free_powers=False, kind="donut", x0=None, grid_step=None,
-               maxiter=200):
+               maxiter=200, chunk=_CHUNK, allow_overlap=False):
     """MLE continuo con el modelo de mezcla (C conocida). Ver el docstring del módulo.
 
     ``sbr``: Ns/Nb del ciclo completo (valor conocido, o arranque si ``free_bg``).
     ``powers``: potencias relativas conocidas (o arranque si ``free_powers``).
     Devuelve un ``MLEResult`` (r, on_boundary, converged, nll, n_iter, beta, powers,
     boundary_fraction, n_failed, globals_result). Localizaciones sin cuentas: r = NaN.
+    ``chunk``: localizaciones por bloque del arranque en grilla (solo memoria; mismo resultado).
+    ``allow_overlap``: con ``b > T/K`` (ventanas solapadas) levanta ``ValueError`` salvo True
+    (entonces solo ``warnings.warn``).
     """
     if not (0 < b <= T):
         raise ValueError("se necesita 0 < b <= T")
     if C is None:
         raise ValueError("mle_mixing necesita C (use mle_legacy para el modelo sin fuga)")
+    _check_overlap(b, T, np.asarray(pos).shape[0], allow_overlap)
     return _mle_core(counts, pos, fwhm, C, b / float(T), sbr, bounds_radius, center, powers,
-                     free_bg, free_powers, kind, x0, grid_step, maxiter)
+                     free_bg, free_powers, kind, x0, grid_step, maxiter, chunk)
 
 
 def mle_legacy(counts, pos, fwhm, sbr, bounds_radius, center=(0.0, 0.0), powers=None,
                free_bg=False, free_powers=False, kind="donut", x0=None, grid_step=None,
-               maxiter=200):
+               maxiter=200, chunk=_CHUNK):
     """MLE continuo de la Ec. 3.5 (``pos_MINFLUX`` sin la grilla): C = I, fondo 1/K."""
     K = np.asarray(pos).shape[0]
     return _mle_core(counts, pos, fwhm, None, 1.0 / K, sbr, bounds_radius, center, powers,
-                     free_bg, free_powers, kind, x0, grid_step, maxiter)
+                     free_bg, free_powers, kind, x0, grid_step, maxiter, chunk)
 
 
 # ---------------------------------------------------------------------------------------------
@@ -473,7 +510,7 @@ def mle_legacy(counts, pos, fwhm, sbr, bounds_radius, center=(0.0, 0.0), powers=
 # ---------------------------------------------------------------------------------------------
 
 def crb(r, pos, fwhm, C, b, T, sbr, N, powers=None, free_bg=False, free_powers=False,
-        kind="donut", n_is="cycle", return_cov=False):
+        kind="donut", n_is="cycle", return_cov=False, allow_overlap=False):
     """CRB por eje sigma = sqrt(tr(Cov_xy)/2) del modelo de mezcla (multinomial en las ventanas).
 
     ``N``: fotones por localización. ``n_is='cycle'`` (default, la convención del plan): N = Ns+Nb
@@ -484,9 +521,12 @@ def crb(r, pos, fwhm, C, b, T, sbr, N, powers=None, free_bg=False, free_powers=F
     marginalizan con el complemento de Schur sobre el Fisher conjunto de todas las filas de
     ``r`` (cada una con N fotones). Sin identificabilidad devuelve inf.
     Con C = I, b = T/K y sbr = inf coincide con el CRB ingenuo (``crb_minflux``).
+    Con ``b > T/K`` (ventanas solapadas, la multinomial deja de valer) levanta ``ValueError``
+    salvo ``allow_overlap=True`` (solo ``warnings.warn``).
     """
     if not (0 < b <= T):
         raise ValueError("se necesita 0 < b <= T")
+    _check_overlap(b, T, np.asarray(pos).shape[0], allow_overlap)
     r = np.asarray(r, dtype=float)
     single = r.ndim == 1
     r2 = np.atleast_2d(r)

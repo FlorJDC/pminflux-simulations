@@ -1,0 +1,32 @@
+{
+ "timeline_20MHz.png": {
+  "title": "Línea de tiempo del ciclo a 20 MHz y fuga entre pulsos",
+  "caption": "Esquema analítico (pminflux_sim.mixing, sin simulación) de un ciclo TCSPC de T = 50 ns con K = 4 pulsos cada 12.5 ns. Arriba, el setup medido: decaimiento exponencial τ = 4.21 ns con IRF gaussiana de 0.3 ns FWHM (recuadro) y ventanas [i·12.5, i·12.5 + 10.1] ns. La cola del haz 0 (rayado) cae dentro de la ventana 1: C[1][0] = 0.0467, es decir un 4.7 % de los fotones del haz 0 se cuentan como del haz 1 (C[i][i] = 0.9092). Abajo, el supuesto de los estudios legados (Tlife = 0.001 ns, b = 12.5 ns): los pulsos son instantáneos y la fuga es nula. Si se simula así, el estudio no puede ver el desajuste del estimador sin fuga (el \"crimen inverso\" F104+F201). C sin IRF, igual a results/mixing_validation.json:C_no_irf.",
+  "source": "results/mixing_validation.json:C_no_irf (recalculado con pminflux_sim.mixing.mixing_matrix)"
+ },
+ "mixing_validation.png": {
+  "title": "Validación de la matriz de mezcla contra sim_exp",
+  "caption": "Fracciones por ventana que produce sim_exp + nMINFLUX del legado (2000 llamadas, 4.16e+06 fotones en ventanas, 1e-03 fotones/ciclo, λ = [0.12, 0.28, 0.35, 0.25], SBR 10) frente al modelo de mezcla (C con τ = 4.21 ns y ventanas [0, 10.1] ns) y al modelo ingenuo sin fuga de pos_MINFLUX/crb_minflux (Ec. 3.5). Las barras de ±SE (≈2e-4) son más chicas que el trazo. Derecha: desvío por ventana en unidades de SE. La mezcla es consistente (χ² = 5.66, 3 g.l., p = 0.129; desvíos entre -1.6 y +2.2 SE) y el ingenuo queda rechazado (χ² = 1927, desvío de +27.6 SE en la ventana 0). Conclusión: sim_exp sí tiene fuga entre pulsos y el estimador legado no la modela.",
+  "source": "results/mixing_validation.json:frac_observed,frac_mixing,frac_naive,dev_se_mixing,dev_se_naive,chi2_pvalue_mixing_vs_sim_exp,chi2_pvalue_naive_vs_sim_exp"
+ },
+ "rate_sweep.png": {
+  "title": "Desvío por tasa finita: 'highest' y 'earliest' frente a la mezcla",
+  "caption": "Máximo sobre las 4 ventanas del desvío predicho (exacto a tasa finita, pminflux_sim.mixing) entre las fracciones por ventana y el modelo de mezcla (tasa → 0), en SE de una localización de 2000 fotones, frente a la tasa por ciclo (Ns 2000, Nb 200, λ = [0.12, 0.28, 0.35, 0.25], τ = 4.21, [0, 10.1] ns). 'earliest' se reescaló de SE totales a SE por localización con √(2000/n_detected_total), el mismo factor que reproduce la clave de 'highest'. Las dos curvas se superponen: 'earliest' tiene la misma magnitud y el signo opuesto. En los puntos calculados dentro de la banda del tracking (1e-3–5.5e-3 fotones/ciclo) el desvío es ≤ 0.026 SE (0.009 a 1e-3, 0.026 a 3e-3). Crece de forma lineal con la tasa: 0.086 a 0.01, 0.90 a 0.1 y 3.06 a 0.3/ciclo. Los rombos/triángulos son la configuración de los estudios a 0.0105/ciclo (0.093 y 0.097 SE). Conclusión: la sobrescritura por ciclo de sim_exp (F101) existe, pero no importa en el régimen del tracking.",
+  "source": "results/mixing_rate_sweep.json:points[*].pred_highest_minus_mixing_in_se_per_2000ph_localization,points[*].pred_earliest_minus_mixing_in_se,studies_config"
+ },
+ "legacy_vs_v2.png": {
+  "title": "Estimador legado frente al MLE con matriz de mezcla",
+  "caption": "|sesgo| (arriba, nm) y RMSE/CRB (abajo) de 2000 localizaciones por caso, con barras de ±SE por bootstrap (500 remuestreos), para el MLE legado de la Ec. 3.5, el MLE con matriz de mezcla y el MLE de mezcla con fondo libre por localización. Datos del simulador v2 (source = v2sim), Ns = 2000, en 5 posiciones (P1 = (5, -5), P2 = (-5.07, -7.56), P3 = (20, 0), P4 = (-15, 15), P5 = (0, -30) nm), SBR 21/6 e IRF 0/0.3 ns. El legado tiene un sesgo de 0.57–2.69 nm (RMSE/CRB 1.12–2.06) que sigue al sesgo asintótico calculado (guion negro); los dos estimadores de mezcla quedan en 0.011–0.112 nm y RMSE/CRB 0.982–1.022. El CRB es el del modelo con fuga (con fondo libre, el suyo). Conclusión: modelar la fuga elimina el sesgo (F104) y alcanza el CRB con fuga.",
+  "source": "results/compare_legacy_vs_v2.json:cases[*].estimators.{legacy,mixing,mixing_freebg}.{bias_abs,rmse_over_crb},cases[*].legacy_asymptotic_bias_nm"
+ },
+ "f201_leakage.png": {
+  "title": "F201: los estudios apagan la fuga",
+  "caption": "Pipeline legado (sim_exp + nMINFLUX + pos_MINFLUX; Ns 2000, Nb 95, emisor en el píxel (−5, −8), 1000 muestras) con los parámetros de los estudios (Tlife = 0.001 ns, b = 12.5 ns; celeste) y con los del experimento (τ = 4.21 ns, ventanas [0, 10.1] ns; rojo rayado), para cada EBP × estimador (honesto = modelo correcto del EBP; ingenuo = geometría ideal). Ideal honesto: |sesgo| 0.11 → 2.98 nm; RMSE/CRB 1.07 → 2.75 contra el CRB sin fuga (0.864 nm) que usa el estudio (cociente RMSE/CRB calculado aquí de las claves rmse y crb), o ≈2.5 contra el CRB con fuga (0.945 nm, rombo). Realista ingenua: 5.5 → 10.8 nm. Escalas logarítmicas; ±SE de Monte Carlo en el sesgo. Conclusión: la conclusión \"el honesto alcanza el CRB\" vale sin fuga, no en el experimento a 20 MHz (clase DISEÑO).",
+  "source": "equipo/2026-09-28_review-pminflux-sim/work/w3/F201_out.json:study_A.*.{C0,C3}.{bias_abs,rmse},study_A.*.crb; results/findings.json:F201.impact (CRB con fuga)"
+ },
+ "dead_time_sweep.png": {
+  "title": "Sesgo por tiempo muerto y tasa finita en el simulador v2",
+  "caption": "Máximo |sesgo| sobre las 4 ventanas de las fracciones del simulador v2 frente a la mezcla ideal (window_probs), en SE de una localización de 2000 fotones (3000 localizaciones por punto, semilla 20260928, IRF 0.3 ns, SBR 21), para TCSPC 'earliest' con tiempo muerto d = 0/22/50/100 ns y para 'highest' (emulación de sim_exp). El tiempo muerto de 22 ns es un SUPUESTO (valor típico de SPAD), no un valor medido. Con d = n·T (50 y 100 ns) el sesgo se anula exactamente (resultado demostrado y verificado): 0.012–0.024 y 0.015–0.034 SE, dentro del ruido de MC (franja gris, 2·SE_MC ≈ 0.037; p del χ² contra la mezcla ≥ 0.30). Con d = 22 ns: 0.030 SE a 1e-3, 0.079 a 5.5e-3 y 0.099 a 0.0105 fotones/ciclo. Conclusión: en el régimen de tracking el sesgo por tasa finita es ≤0.08 SE por localización.",
+  "source": "results/dead_time_sweep.json:rows[*].max_abs_bias_SE_per_loc,rows[*].mc_se_in_SE_per_loc,assumptions"
+ }
+}
