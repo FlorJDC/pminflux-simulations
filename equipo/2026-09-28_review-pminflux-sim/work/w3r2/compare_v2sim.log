@@ -1,0 +1,21 @@
+irf 0.0 SBR21 (5.0, -5.0)    | legacy |b| 0.796 RMSE/CRB 1.233 | mixing |b| 0.033 RMSE/CRB 1.000 | freebg RMSE/CRB 1.003
+irf 0.0 SBR21 (-5.07, -7.56) | legacy |b| 1.419 RMSE/CRB 1.694 | mixing |b| 0.053 RMSE/CRB 1.006 | freebg RMSE/CRB 1.006
+irf 0.0 SBR21 (20.0, 0.0)    | legacy |b| 1.586 RMSE/CRB 1.401 | mixing |b| 0.050 RMSE/CRB 1.002 | freebg RMSE/CRB 1.003
+irf 0.0 SBR21 (-15.0, 15.0)  | legacy |b| 2.605 RMSE/CRB 2.000 | mixing |b| 0.079 RMSE/CRB 0.993 | freebg RMSE/CRB 0.988
+irf 0.0 SBR21 (0.0, -30.0)   | legacy |b| 2.415 RMSE/CRB 1.573 | mixing |b| 0.112 RMSE/CRB 0.985 | freebg RMSE/CRB 0.982
+irf 0.0 SBR6 (5.0, -5.0)    | legacy |b| 0.567 RMSE/CRB 1.122 | mixing |b| 0.038 RMSE/CRB 1.013 | freebg RMSE/CRB 1.019
+irf 0.0 SBR6 (-5.07, -7.56) | legacy |b| 0.736 RMSE/CRB 1.252 | mixing |b| 0.015 RMSE/CRB 1.014 | freebg RMSE/CRB 1.014
+irf 0.0 SBR6 (20.0, 0.0)    | legacy |b| 1.583 RMSE/CRB 1.348 | mixing |b| 0.098 RMSE/CRB 1.016 | freebg RMSE/CRB 1.015
+irf 0.0 SBR6 (-15.0, 15.0)  | legacy |b| 2.303 RMSE/CRB 1.762 | mixing |b| 0.019 RMSE/CRB 0.995 | freebg RMSE/CRB 0.994
+irf 0.0 SBR6 (0.0, -30.0)   | legacy |b| 1.942 RMSE/CRB 1.370 | mixing |b| 0.045 RMSE/CRB 1.009 | freebg RMSE/CRB 1.019
+irf 0.3 SBR21 (5.0, -5.0)    | legacy |b| 0.875 RMSE/CRB 1.260 | mixing |b| 0.040 RMSE/CRB 0.999 | freebg RMSE/CRB 0.995
+irf 0.3 SBR21 (-5.07, -7.56) | legacy |b| 1.489 RMSE/CRB 1.710 | mixing |b| 0.033 RMSE/CRB 0.990 | freebg RMSE/CRB 0.990
+irf 0.3 SBR21 (20.0, 0.0)    | legacy |b| 1.637 RMSE/CRB 1.420 | mixing |b| 0.024 RMSE/CRB 1.002 | freebg RMSE/CRB 0.997
+irf 0.3 SBR21 (-15.0, 15.0)  | legacy |b| 2.694 RMSE/CRB 2.059 | mixing |b| 0.047 RMSE/CRB 1.022 | freebg RMSE/CRB 1.016
+irf 0.3 SBR21 (0.0, -30.0)   | legacy |b| 2.448 RMSE/CRB 1.585 | mixing |b| 0.097 RMSE/CRB 0.998 | freebg RMSE/CRB 0.993
+irf 0.3 SBR6 (5.0, -5.0)    | legacy |b| 0.568 RMSE/CRB 1.115 | mixing |b| 0.017 RMSE/CRB 1.004 | freebg RMSE/CRB 1.005
+irf 0.3 SBR6 (-5.07, -7.56) | legacy |b| 0.674 RMSE/CRB 1.231 | mixing |b| 0.063 RMSE/CRB 1.011 | freebg RMSE/CRB 1.007
+irf 0.3 SBR6 (20.0, 0.0)    | legacy |b| 1.663 RMSE/CRB 1.371 | mixing |b| 0.038 RMSE/CRB 1.005 | freebg RMSE/CRB 1.004
+irf 0.3 SBR6 (-15.0, 15.0)  | legacy |b| 2.381 RMSE/CRB 1.796 | mixing |b| 0.022 RMSE/CRB 0.997 | freebg RMSE/CRB 0.999
+irf 0.3 SBR6 (0.0, -30.0)   | legacy |b| 1.960 RMSE/CRB 1.377 | mixing |b| 0.060 RMSE/CRB 1.012 | freebg RMSE/CRB 1.003
+source=v2sim  runtime 60.2 s  -> C:\Users\BANGHO\Documents\GithubPRO\pminflux-sim-v2\results\compare_legacy_vs_v2.json

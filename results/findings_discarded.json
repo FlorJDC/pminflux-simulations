@@ -1,0 +1,194 @@
+[
+ {
+  "id": "F105",
+  "title": "(v) Ns y Nb fijos exactos en sim_exp vs el modelo Mult(N,p) del CRB",
+  "legacy_location": "legacy/p-minflux-main/tools/tools_simulations.py:533-559",
+  "evidence": "Real pero despreciable: con Ns y Nb fijos la σ del MLE (sándwich) es 0–0.71 % menor que el CRB multinomial en los 5 puntos (verificador: 0.993–1.000; 0.990 en (40,0)). RMSE/CRB de los estudios queda sesgado a la baja < 1 %.",
+  "script": "scripts/findings/F105_fixed_Ns_Nb_vs_multinomial_crb.py",
+  "status": "discarded-verified",
+  "verified_by": "verifier-A r01: [verified] F105 (descartado): con Ns y Nb fijos la sigma del sandwich es 0-0.71 % menor que el CRB multinomial en los 5 puntos (propio: 0.993-1.000; 0.990 en (40,0)); despreciable",
+  "corrections_applied": []
+ },
+ {
+  "id": "F151",
+  "title": "(vii) crb_minflux vs donutloc.fisher",
+  "legacy_location": "legacy/p-minflux-main/tools/tools_simulations.py:583-885",
+  "evidence": "Correcto: crb_minflux (método 1, px = 1) coincide con un Fisher continuo independiente dentro de 4.4e-4 nm (W2: métodos 1–3 contra donutloc dentro de 5.4e-4 con px = 1, error O(px²)).",
+  "script": "scripts/findings/F151_crb_minflux_vs_donutloc.py",
+  "status": "discarded-verified",
+  "verified_by": "verifier-A r01: [verified] F151 (descartado): crb_minflux metodo 1 con px=1 coincide con un Fisher continuo independiente dentro de 4.4e-4 nm; correcto",
+  "corrections_applied": []
+ },
+ {
+  "id": "F152",
+  "title": "(v) fondo solo en ciclos sin senal y sin recorte TCSPC; muestreo en dos pasos; pliegue % dt",
+  "legacy_location": "legacy/p-minflux-main/tools/tools_simulations.py:454-465, :558-573",
+  "evidence": "El fondo aporta exactamente Nb·b/T por ventana (lo confirman las 4 campañas del verificador), el muestreo en dos pasos es exacto por factorización y el pliegue % dt es periódico para los conteos.",
+  "script": "scripts/findings/F152_sampling_and_background_checks.py",
+  "status": "discarded-verified",
+  "verified_by": "verifier-A r01: [verified] F152 (descartado): el fondo aporta exactamente Nb*b/T por ventana (lo confirman las 4 campanas propias), el muestreo en dos pasos es exacto por factorizacion y el pliegue %dt es periodico para los conteos. No verificada la cota de perdida por haz <=3.6e-4",
+  "corrections_applied": [
+   {
+    "from": "'pérdida selectiva por haz ≤ 3.6e-4' como evidencia",
+    "to": "nota 'cota ≤3.6e-4 no verificada'",
+    "source": "verifier-A r01 (state.json F152) + r02-pi.md"
+   }
+  ],
+  "note": "cota ≤3.6e-4 no verificada (pérdida selectiva por haz que impondría un TCSPC real a la tasa de los estudios)"
+ },
+ {
+  "id": "F153",
+  "title": "spaceToIndex/indexToSpace vs la grilla de psf()",
+  "legacy_location": "legacy/p-minflux-main/tools/tools_simulations.py:93-114, :181-185",
+  "evidence": "spaceToIndex con rint coincide con el mínimo de psf() (0/20 discrepancias); el truncado viejo sesgaba (−0.50, +0.50) nm con px = 1: la corrección de la autora es correcta.",
+  "script": "scripts/findings/F153_index_space_consistency.py",
+  "status": "discarded-verified",
+  "verified_by": "verifier-A r01: [verified] F153 (descartado): spaceToIndex con rint coincide con el minimo de psf() (0/20 discrepancias)",
+  "corrections_applied": []
+ },
+ {
+  "id": "F154",
+  "title": "(ix) rama cw_minflux",
+  "legacy_location": "legacy/p-minflux-main/tools/tools_simulations.py:389-419, :473-493, :531",
+  "evidence": "Confirmado: np.reshape falla con ValueError cuando M_p no es múltiplo de cycle_time/dt. Ningún script usa la rama cw.",
+  "script": "scripts/findings/F154_cw_minflux_branch.py",
+  "status": "unclear",
+  "verified_by": "verifier-A r01: [unclear] F154 (descartado): se confirma el ValueError cuando M_p no es multiplo de cycle_time/dt; no reproduje el 88.5 % en la ventana 0 ni el chi2 p=0.74 con el haz recuperado del macrotiempo",
+  "corrections_applied": [
+   {
+    "from": "status 'descartado'",
+    "to": "status 'unclear' (88.5 % y p = 0.74 sin reproducir)",
+    "source": "verifier-A r01 (state.json F154, unclear) + r02-pi.md"
+   }
+  ],
+  "missing": "No se reprodujo el 88.5 % de fotones en la ventana 0 con nMINFLUX ni el χ² p = 0.74 con el haz recuperado del macrotiempo; para decidir hace falta re-correr scripts/findings/F154_cw_minflux_branch.py con otra semilla y un contador por macrotiempo independiente."
+ },
+ {
+  "id": "D-iv",
+  "title": "(iv) docstring de dt 'typically 25 ns'",
+  "legacy_location": "legacy/p-minflux-main/tools/tools_simulations.py:337, :352, :404 ('6.5 ns' en vez de 6.25)",
+  "evidence": "No es un error: 25 ns era el setup de 40 MHz de Masullo (simulations_example.py:47). Los scripts de la autora pasan dt=50 (simulation_misalignment.py:54, make_fig_eficiencia.py:39). Solo actualizar el docstring.",
+  "script": null,
+  "status": "discarded-verified",
+  "verified_by": "verifier-A r01: [verified] D-iv/D-ii/D-vi (descartados): dt=25 es el setup de 40 MHz de Masullo (simulations_example.py:47) y los estudios usan 50; errata 6.5 en vez de 6.25; el borde estricto solo importa para el 0.0 (F102); NaN->-inf solo es patologico con SBR=inf (F110)",
+  "corrections_applied": []
+ },
+ {
+  "id": "D-ii",
+  "title": "(ii) desigualdad estricta en los bordes de nMINFLUX",
+  "legacy_location": "legacy/p-minflux-main/tools/tools_simulations.py:996",
+  "evidence": "Los microtiempos son continuos: la unica masa puntual es el 0.0 de los ciclos vacios (F102). Fuera de eso el borde abierto/cerrado no cambia ningun conteo con probabilidad 1.",
+  "script": null,
+  "status": "discarded-verified",
+  "verified_by": "verifier-A r01: [verified] D-iv/D-ii/D-vi (descartados): dt=25 es el setup de 40 MHz de Masullo (simulations_example.py:47) y los estudios usan 50; errata 6.5 en vez de 6.25; el borde estricto solo importa para el 0.0 (F102); NaN->-inf solo es patologico con SBR=inf (F110)",
+  "corrections_applied": []
+ },
+ {
+  "id": "D-vi",
+  "title": "(vi) NaN -> -inf en pos_MINFLUX",
+  "legacy_location": "legacy/p-minflux-main/tools/tools_simulations.py:1049-1050",
+  "evidence": "Correcto para los bordes rellenados con ceros (normPSF=0). El unico caso patologico es SBR=inf (F110).",
+  "script": null,
+  "status": "discarded-verified",
+  "verified_by": "verifier-A r01: [verified] D-iv/D-ii/D-vi (descartados): dt=25 es el setup de 40 MHz de Masullo (simulations_example.py:47) y los estudios usan 50; errata 6.5 en vez de 6.25; el borde estricto solo importa para el 0.0 (F102); NaN->-inf solo es patologico con SBR=inf (F110)",
+  "corrections_applied": []
+ },
+ {
+  "id": "F290-D1",
+  "title": "Fallos de sim_exp descartados sin reportar la tasa",
+  "legacy_location": null,
+  "evidence": "sim_exp no falla en las configuraciones de los estudios (0/300 con Ns = 2000); el margen mínimo de ciclos es 3 / 55 / 76 / 105 para Ns = 90 / 1440 / 2000 / 2880. La tasa de fallos es 0 igual, así que no reportarla no cambia nada.",
+  "script": "scripts/findings/F290_discarded_suspicions_B.py",
+  "status": "discarded-verified",
+  "verified_by": "verifier-B r01: [verified] F290-D1: sim_exp no falla en las configuraciones de los estudios (0/300 con Ns=2000); el margen mínimo de ciclos es 3/55/76/105 para Ns=90/1440/2000/2880 (el 'margen ≥77' del reporte solo vale para Ns ≥ 2000)",
+  "corrections_applied": [
+   {
+    "from": "'margen ≥77' (y mínimos 92/1869/2077/2982 > Ns)",
+    "to": "margen mínimo 3/55/76/105 para Ns = 90/1440/2000/2880",
+    "source": "verifier-B r01 (state.json F290-D1) + r02-pi.md"
+   }
+  ]
+ },
+ {
+  "id": "F290-D2",
+  "title": "Convención de ejes (flip y/-y) inconsistente entre psf(), Grid y ebp",
+  "legacy_location": null,
+  "evidence": "La convención de ejes de psf()/Grid/ebp es consistente: una dona independiente coincide con ebp_ideal a 3e-16 y argmin = posición redondeada. La orientación física respecto del escáner no se puede comprobar desde el código.",
+  "script": "scripts/findings/F290_discarded_suspicions_B.py",
+  "status": "discarded-verified",
+  "verified_by": "verifier-B r01: [verified] F290-D2: la convención de ejes de psf()/Grid/ebp es consistente (mi dona coincide con ebp_ideal a 3e-16; argmin = posición redondeada)",
+  "corrections_applied": []
+ },
+ {
+  "id": "F290-D3",
+  "title": "simulations_example.py (Masullo) l.183-184: el reshape tras quitar NaN mezcla x e y",
+  "legacy_location": null,
+  "evidence": "El reshape tras quitar NaN en simulations_example.py:182-183 conserva los pares (x, y), porque los NaN vienen por columnas completas.",
+  "script": "scripts/findings/F290_discarded_suspicions_B.py",
+  "status": "discarded-verified",
+  "verified_by": "verifier-B r01: [verified] F290-D3: el reshape tras quitar NaN en simulations_example.py:182-183 conserva los pares (x,y)",
+  "corrections_applied": [
+   {
+    "from": "l.183-184",
+    "to": "l.182-183",
+    "source": "verifier-B r01 (state.json F290-D3)"
+   }
+  ]
+ },
+ {
+  "id": "F290-D4",
+  "title": "Usar conteos multinomiales en vez de sim_exp (F203-F205, y el MC rápido de ella) no es equivalente",
+  "legacy_location": null,
+  "evidence": "Con Tlife = 0.001 y b = dt/K las fracciones por ventana de sim_exp coinciden con el modelo 1/K (628 500 fotones, |z| ≤ 1.3). La conclusión (equivalencia) se mantiene.",
+  "script": "scripts/findings/F290_discarded_suspicions_B.py",
+  "status": "discarded-verified",
+  "verified_by": "verifier-B r01: [verified] F290-D4: con Tlife=0.001 y b=dt/K, las fracciones por ventana de sim_exp coinciden con el modelo 1/K (628 500 fotones, |z| ≤ 1.3). No reproduzco el +2.6σ del haz 3 que el worker atribuye a F101; parece una fluctuación",
+  "corrections_applied": [
+   {
+    "from": "'z = (−1.4, −1.0, −0.5, +2.6); el exceso del haz 3 (+0.6 %) es el efecto F101'",
+    "to": "se quita la atribución del +2.6σ a F101: el verificador no lo reproduce (parece una fluctuación)",
+    "source": "verifier-B r01 (state.json F290-D4) + r02-pi.md"
+   }
+  ]
+ },
+ {
+  "id": "F290-D5",
+  "title": "El centrado entero de ebp_experimental deja los mínimos corridos respecto de pos_nm",
+  "legacy_location": null,
+  "evidence": "El centrado entero de ebp_experimental deja argmin = pos_nm en los 4 haces (PSF 20260703).",
+  "script": "scripts/findings/F290_discarded_suspicions_B.py",
+  "status": "discarded-verified",
+  "verified_by": "verifier-B r01: [verified] F290-D5: el centrado entero de ebp_experimental deja argmin = pos_nm en los 4 haces (PSF 20260703)",
+  "corrections_applied": []
+ },
+ {
+  "id": "F290-D6",
+  "title": "zero_ratio de fit_donut_fwhm mal calculado",
+  "legacy_location": null,
+  "evidence": "zero_ratio usa min/max del mapa 2D mientras el docstring dice 'del perfil' (ebp.py:545 contra :578); es solo una inconsistencia del docstring, y el valor del mapa es la mejor estimación.",
+  "script": "scripts/findings/F290_discarded_suspicions_B.py",
+  "status": "discarded-verified",
+  "verified_by": "verifier-B r01: [verified] F290-D6: zero_ratio usa min/max del mapa 2D mientras el docstring dice 'del perfil' (ebp.py:545 vs 578); es solo una inconsistencia del docstring",
+  "corrections_applied": []
+ },
+ {
+  "id": "F290-D7",
+  "title": "La comparación honesta/ingenua no es justa",
+  "legacy_location": null,
+  "evidence": "La comparación honesta/ingenua es justa: una semilla antes de todos los casos y el mismo r0, SBR y R_SEARCH_NM (simulation_misalignment.py:250-256).",
+  "script": "scripts/findings/F290_discarded_suspicions_B.py",
+  "status": "discarded-verified",
+  "verified_by": "verifier-B r01: [verified] F290-D7: la comparación honesta/ingenua es justa (una semilla antes de todos los casos, mismo r0, SBR y R_SEARCH_NM; simulation_misalignment.py:250-256)",
+  "corrections_applied": []
+ },
+ {
+  "id": "F290-D8",
+  "title": "El CRB con N = Ns+Nb y fondo en p no es comparable con un MC de N fijo",
+  "legacy_location": null,
+  "evidence": "El CRB con N = Ns + Nb es consistente con el MC de N fijo: max|p_crb − p_MC| en r0 = 4e-4 y un Fisher independiente da 0.864 nm, igual que el legado.",
+  "script": "scripts/findings/F201_leakage_off_in_studies.py",
+  "status": "discarded-verified",
+  "verified_by": "verifier-B r01: [verified] F290-D8: el CRB con N=Ns+Nb es consistente con el MC de N fijo: max|p_crb − p_MC| en r0 = 4e-4 y el Fisher propio da 0.864 nm, igual que el legado",
+  "corrections_applied": []
+ }
+]

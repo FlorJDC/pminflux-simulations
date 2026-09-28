@@ -1,0 +1,21 @@
+irf 0.0 SBR21 (5.0, -5.0)    | legacy |b| 0.821 RMSE/CRB 1.255 | mixing |b| 0.008 RMSE/CRB 1.006 | freebg RMSE/CRB 1.007
+irf 0.0 SBR21 (-5.07, -7.56) | legacy |b| 1.479 RMSE/CRB 1.716 | mixing |b| 0.012 RMSE/CRB 0.997 | freebg RMSE/CRB 0.995
+irf 0.0 SBR21 (20.0, 0.0)    | legacy |b| 1.617 RMSE/CRB 1.419 | mixing |b| 0.023 RMSE/CRB 1.005 | freebg RMSE/CRB 1.005
+irf 0.0 SBR21 (-15.0, 15.0)  | legacy |b| 2.728 RMSE/CRB 2.077 | mixing |b| 0.038 RMSE/CRB 1.010 | freebg RMSE/CRB 1.004
+irf 0.0 SBR21 (0.0, -30.0)   | legacy |b| 2.355 RMSE/CRB 1.557 | mixing |b| 0.024 RMSE/CRB 0.997 | freebg RMSE/CRB 0.992
+irf 0.0 SBR6 (5.0, -5.0)    | legacy |b| 0.606 RMSE/CRB 1.121 | mixing |b| 0.020 RMSE/CRB 1.000 | freebg RMSE/CRB 0.997
+irf 0.0 SBR6 (-5.07, -7.56) | legacy |b| 0.717 RMSE/CRB 1.231 | mixing |b| 0.016 RMSE/CRB 1.001 | freebg RMSE/CRB 1.001
+irf 0.0 SBR6 (20.0, 0.0)    | legacy |b| 1.701 RMSE/CRB 1.405 | mixing |b| 0.038 RMSE/CRB 1.021 | freebg RMSE/CRB 1.020
+irf 0.0 SBR6 (-15.0, 15.0)  | legacy |b| 2.379 RMSE/CRB 1.814 | mixing |b| 0.051 RMSE/CRB 1.015 | freebg RMSE/CRB 1.019
+irf 0.0 SBR6 (0.0, -30.0)   | legacy |b| 1.945 RMSE/CRB 1.366 | mixing |b| 0.074 RMSE/CRB 1.003 | freebg RMSE/CRB 1.011
+irf 0.3 SBR21 (5.0, -5.0)    | legacy |b| 0.844 RMSE/CRB 1.244 | mixing |b| 0.019 RMSE/CRB 0.986 | freebg RMSE/CRB 0.986
+irf 0.3 SBR21 (-5.07, -7.56) | legacy |b| 1.485 RMSE/CRB 1.726 | mixing |b| 0.028 RMSE/CRB 1.007 | freebg RMSE/CRB 1.011
+irf 0.3 SBR21 (20.0, 0.0)    | legacy |b| 1.653 RMSE/CRB 1.434 | mixing |b| 0.008 RMSE/CRB 1.009 | freebg RMSE/CRB 1.005
+irf 0.3 SBR21 (-15.0, 15.0)  | legacy |b| 2.732 RMSE/CRB 2.066 | mixing |b| 0.028 RMSE/CRB 1.003 | freebg RMSE/CRB 0.999
+irf 0.3 SBR21 (0.0, -30.0)   | legacy |b| 2.402 RMSE/CRB 1.571 | mixing |b| 0.013 RMSE/CRB 0.999 | freebg RMSE/CRB 0.993
+irf 0.3 SBR6 (5.0, -5.0)    | legacy |b| 0.589 RMSE/CRB 1.121 | mixing |b| 0.036 RMSE/CRB 1.006 | freebg RMSE/CRB 1.007
+irf 0.3 SBR6 (-5.07, -7.56) | legacy |b| 0.694 RMSE/CRB 1.232 | mixing |b| 0.047 RMSE/CRB 1.009 | freebg RMSE/CRB 1.006
+irf 0.3 SBR6 (20.0, 0.0)    | legacy |b| 1.658 RMSE/CRB 1.363 | mixing |b| 0.034 RMSE/CRB 0.995 | freebg RMSE/CRB 0.993
+irf 0.3 SBR6 (-15.0, 15.0)  | legacy |b| 2.392 RMSE/CRB 1.810 | mixing |b| 0.046 RMSE/CRB 1.010 | freebg RMSE/CRB 1.007
+irf 0.3 SBR6 (0.0, -30.0)   | legacy |b| 2.010 RMSE/CRB 1.388 | mixing |b| 0.055 RMSE/CRB 1.011 | freebg RMSE/CRB 1.009
+source=multinomial  runtime 16.3 s  -> equipo/2026-09-28_review-pminflux-sim/work/w3r2/compare_multinomial.json

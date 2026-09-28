@@ -1,0 +1,622 @@
+[
+ {
+  "id": "F101",
+  "title": "sim_exp: en un ciclo con fotones de ≥2 haces sobrevive el de índice k más alto (un TCSPC real se queda con el más temprano)",
+  "class": "IMPLEMENTACION",
+  "legacy_location": "legacy/p-minflux-main/tools/tools_simulations.py:511-527 (np.nonzero recorre por filas y Tmicro[m1] = k1*Texp + Exp se sobrescribe, l.522-527); recorte a 1 fotón por ranura en l.464",
+  "scenario": "Mecanismo: tasa alta, 0.8 fotones/ciclo (verificador A: 60 llamadas, 8e4 fotones). Impacto: tasa de los estudios, 0.0105 fotones/ciclo (M_p = 2e5, Nh = 2100), y tasas del tracking, 1e-3 a 5e-3 fotones/ciclo.",
+  "impact": "A 0.8/ciclo sim_exp coincide con la regla 'gana el k más alto' (|z| ≤ 1.5) y se aparta de p hasta 47 SE. A 0.0105/ciclo el 0.379 % de los ciclos ocupados tiene ≥2 haces y el sesgo relativo máximo es 0.461 %; por localización de 2000 fotones es ≤0.09–0.10 SE (MIX-STUDY). Latente a las tasas del tracking (1e-3 a 5e-3/ciclo): ≤0.05 SE por localización (MIX-TRACKING).",
+  "fix": "Por ciclo, quedarse con el fotón de microtiempo MINIMO (primer foton) y aplicar tiempo muerto; o simular a tasa baja y declararlo.",
+  "script": "scripts/findings/F101_tmicro_overwrite.py",
+  "status": "verified",
+  "author": "no verificable",
+  "author_basis": "tools_simulations.py (encabezado: Luciano Masullo, Lucía López y Lars Richter) no está en la lista de originales de NOTAS.txt, así que la autora lo modificó, pero sin historial git no se puede atribuir la línea concreta. El bucle de sobrescritura (l.521-527, comentarios en inglés) es compatible con el código original; el recorte de l.464 está en la ruta rápida (indicio de la autora, verificador A) y conserva el mismo comportamiento.",
+  "what_was_right": "El recorte a 1 fotón por ranura y el muestreo en dos pasos (multinomial por haz + ciclos uniformes) son exactos por factorización (F152); a las tasas de los estudios y del tracking el efecto es despreciable por localización.",
+  "verified_by": "verifier-A r01: F101 (IMPLEMENTACION, l.522-527/464): en un ciclo con >=2 haces sobrevive el k mas alto; a 0.8/ciclo sim_exp coincide con 'highest' (|z|<=1.5) y se aparta de p hasta 47 SE; a 0.0105: 0.379 % de ciclos con >=2 haces, sesgo relativo maximo 0.461 %",
+  "corrections_applied": [
+   {
+    "from": "0.38 % de ciclos con ≥2 haces; sesgo relativo máximo 0.46 %",
+    "to": "0.379 % y 0.461 % a 0.0105/ciclo",
+    "source": "verifier-A r01 (state.json F101)"
+   },
+   {
+    "from": "escenario 0.5 fotones/ciclo, 60000 fotones, hasta 25 SE (borrador W2)",
+    "to": "0.8 fotones/ciclo, |z| ≤ 1.5 contra 'highest', hasta 47 SE (números verificados)",
+    "source": "verifier-A r01 (state.json F101)"
+   },
+   {
+    "from": "impacto 'ver W1'",
+    "to": "latente a las tasas del tracking (≤0.05 SE por localización)",
+    "source": "r02-pi.md Tarea 1 + state.json MIX-TRACKING"
+   }
+  ],
+  "v2_test": "tests/test_simulate.py::TestSimulateTCSPC::test_earliest_matches_mixing_predictor",
+  "v2_tests": [
+   "tests/test_simulate.py::TestSimulateLegacy::test_highest_overwrite_emulation (antes)",
+   "tests/test_simulate.py::TestSimulateTCSPC::test_earliest_matches_mixing_predictor (después)"
+  ],
+  "v2_fix_status": "pendiente R2 (W2): simulate.py con tcspc='earliest' y tiempo muerto; tcspc='highest' emula el legado. Test fijado, aún no verificado.",
+  "crimen_inverso": false,
+  "draft_source": "results/findings_A.json (R1, borrador)"
+ },
+ {
+  "id": "F102",
+  "title": "Los ceros de los ciclos vacíos en relTime se cuentan en la ventana 0 si la ventana abre antes del pulso (a < 0)",
+  "class": "IMPLEMENTACION",
+  "legacy_location": "legacy/p-minflux-main/tools/tools_simulations.py:517 (Tmicro = np.zeros(M_p)), :569 (concatenate), :996 (relTime > ti estricto)",
+  "scenario": "TCP beams(K=4, L=100), fwhm 360, emisor (5,−5), Ns = 2000, Nb = 95, M_p = 2e5, Tlife = 0.001, dt = 50, b = 12.5; a = 0 frente a a = −0.25 ns; 20 repeticiones.",
+  "impact": "relTime trae 200095 elementos, 198000 de ellos 0.0 exacto (los ciclos vacíos). Con a = −0.25 ns la ventana 0 cuenta ~198037 fotones y el error medio del MLE es 70 nm (1.25 nm con a = 0). Con a = 0 funciona solo por la desigualdad estricta. Latente: todos los estudios usan a = 0.",
+  "fix": "Devolver solo los microtiempos de fotones detectados (sin ceros) o una mascara; validar a,b en nMINFLUX.",
+  "script": "scripts/findings/F102_zeros_in_window0.py",
+  "status": "verified",
+  "author": "no verificable",
+  "author_basis": "tools_simulations.py (encabezado: Luciano Masullo, Lucía López y Lars Richter) no está en la lista de originales de NOTAS.txt, así que la autora lo modificó, pero sin historial git no se puede atribuir la línea concreta.",
+  "what_was_right": "Con a = 0 y la desigualdad estricta el conteo es correcto: los ceros quedan fuera de todas las ventanas.",
+  "verified_by": "verifier-A r01: F102 (IMPLEMENTACION latente, l.517/569/996): relTime trae 198000 ceros de 200095; con a=-0.25 la ventana 0 cuenta ~198037 y el error medio del MLE es 70 nm (1.25 nm con a=0); a=0 funciona solo por la desigualdad estricta",
+  "corrections_applied": [
+   {
+    "from": "error medio 1.28 nm (a = 0) y 69.9 nm (a = −0.25)",
+    "to": "1.25 nm y 70 nm",
+    "source": "verifier-A r01 (state.json F102)"
+   },
+   {
+    "from": "'el MLE termina en el borde en el 100 %, estimación media (74.4,−4.2) nm'",
+    "to": "se omite: no figura en el texto verificado",
+    "source": "r02-pi.md: números de state.json"
+   }
+  ],
+  "v2_test": "tests/test_simulate.py::TestSimulateLegacy::test_legacy_counting_zeros_in_window0",
+  "v2_tests": [
+   "tests/test_simulate.py::TestSimulateLegacy::test_legacy_counting_zeros_in_window0 (antes y después)",
+   "tests/test_simulate.py::TestSimulateMixing::test_irf_negative_start_and_wrap (corrección)"
+  ],
+  "v2_fix_status": "pendiente R2 (W2): counting='periodic' sin ceros; counting='legacy' reproduce el defecto. Test fijado, aún no verificado.",
+  "crimen_inverso": false,
+  "draft_source": "results/findings_A.json (R1, borrador)"
+ },
+ {
+  "id": "F103",
+  "title": "nMINFLUX no pliega las ventanas módulo el período ni controla el solapamiento",
+  "class": "IMPLEMENTACION",
+  "legacy_location": "legacy/p-minflux-main/tools/tools_simulations.py:993-997",
+  "scenario": "S1: ceros filtrados, a = −0.5 ns, b = 12.5 ns, τ = 4.21 y 0.001 ns, TCP, emisor (5,−5), SBR 21. S2: b = 13 ns > dt/K.",
+  "impact": "S2: se cuenta dos veces el 10.9 % (τ = 4.21 ns) / 94.9 % (τ = 0.001 ns) de los fotones, sin aviso. S1: la ventana 0 pierde el tramo [49.5, 50) ns; la pérdida esperada es 6.84 % (τ = 4.21) / 2.54 % (τ = 0.001) de sus cuentas. Con τ = 4.21 la estimación asintótica se desplaza 0.338 nm respecto de ventanas periódicas. Es un desplazamiento, no un sesgo que se suma: con τ = 4.21 el sesgo total con las ventanas del legado (0.88 nm) es menor que con ventanas periódicas (1.18 nm), porque el recorte compensa en parte la fuga; con τ = 0.001 sí suma 0.063 nm. Latente: los estudios usan a = 0 y b = dt/K.",
+  "fix": "Ventana i = {t : (t - tau_i - a) mod T in [0, b)}; error si b > T/K.",
+  "script": "scripts/findings/F103_windows_not_periodic.py",
+  "status": "verified",
+  "author": "no verificable",
+  "author_basis": "tools_simulations.py (encabezado: Luciano Masullo, Lucía López y Lars Richter) no está en la lista de originales de NOTAS.txt, así que la autora lo modificó, pero sin historial git no se puede atribuir la línea concreta.",
+  "what_was_right": "Con a = 0 y b ≤ dt/K, que es lo que usan todos los estudios, las ventanas son correctas.",
+  "verified_by": "verifier-A r01: F103 (IMPLEMENTACION latente, l.993-997): nMINFLUX no pliega ventanas ni controla solapamiento; con b=13 cuenta dos veces el 10.9 % (tau=4.21) / 94.9 % (tau=0.001) de los fotones; con a=-0.5 la estimacion asintotica se desplaza 0.338 nm (tau=4.21)",
+  "corrections_applied": [
+   {
+    "from": "la ventana 0 pierde 5.9 % (τ = 4.21) / 2.8 % (τ = 0.001)",
+    "to": "pérdida esperada 6.84 % / 2.54 % (los del borrador eran MC de 30 llamadas)",
+    "source": "verifier-A r01 (state.json F103-num, refuted) + inbox.jsonl ronda 2"
+   },
+   {
+    "from": "sesgo asintótico extra del MLE 0.34 nm (τ = 4.21) y 0.06 nm (τ = 0.001)",
+    "to": "desplazamiento de 0.338 nm; sesgo total 0.88 nm (legado) contra 1.18 nm (periódico) con τ = 4.21; con τ = 0.001 suma 0.063 nm",
+    "source": "verifier-A r01 (state.json F103-num, refuted) + inbox.jsonl ronda 2"
+   },
+   {
+    "from": "fotones contados dos veces: 11.2 % (τ = 4.21)",
+    "to": "10.9 %",
+    "source": "verifier-A r01 (state.json F103)"
+   },
+   {
+    "from": "'fondo 0.24 vs 0.25 del ciclo'",
+    "to": "se omite: no figura en el texto verificado",
+    "source": "r02-pi.md: números de state.json"
+   }
+  ],
+  "v2_test": "tests/test_simulate.py::TestSimulateLegacy::test_legacy_counting_non_periodic",
+  "v2_tests": [
+   "tests/test_simulate.py::TestSimulateLegacy::test_legacy_counting_non_periodic (antes y después)",
+   "tests/test_simulate.py::TestSimulateMixing::test_irf_negative_start_and_wrap (corrección)"
+  ],
+  "v2_fix_status": "pendiente R2 (W2): ventanas plegadas módulo T (counting='periodic'). Test fijado, aún no verificado.",
+  "crimen_inverso": false,
+  "draft_source": "results/findings_A.json (R1, borrador)"
+ },
+ {
+  "id": "F104",
+  "title": "pos_MINFLUX/crb_minflux (Ec. 3.5: fondo 1/K, sin fuga) no describen ventanas b < T/K ni la fuga entre pulsos",
+  "class": "CONCEPTUAL",
+  "legacy_location": "legacy/p-minflux-main/tools/tools_simulations.py:1041 (p de pos_MINFLUX), :649-661 (crb_minflux), comentario 'EXACTAMENTE' :433 (bloque :423-440)",
+  "scenario": "TCP beams(K=4, L=100), fwhm 360; setup medido τ = 4.21 ns, ventana [0, 10.1] ns, dt = 50 ns; SBR 21 (2000/95) y 6 (2000/333); posiciones (5,−5), (−5.07,−7.56), (20,0), (−15,15) y (0,−30) nm. Sesgo asintótico (sin ruido) del MLE con el modelo de pos_MINFLUX sobre los conteos esperados exactos de sim_exp+nMINFLUX; la mezcla C se validó contra sim_exp en MIX-VALID.",
+  "impact": "Setup medido, SBR 21: sesgo 0.85 / 1.51 / 1.63 / 2.69 / 2.36 nm en las 5 posiciones = 1.04–2.67 veces el CRB de crb_minflux (0.82–1.22 nm), o 0.92–2.45 veces el CRB real. El CRB real es 8.6–13.5 % mayor que el de crb_minflux; unos 2.5 puntos de ese cociente vienen de los fotones que caen fuera de las ventanas (√(2095/1993.5) = 1.025). La ventana 0 en (5,−5) tiene 45.8 % de fotones de otros haces. SBR 6: 0.59–2.32 nm. Domina la fuga: con b = 12.5 y fuga el sesgo ya es 1.05–2.78 nm; solo b = 10.1 sin fuga da 0.01–0.48 nm (SBR en ventanas 26.06). Es sistemático: en unidades de CRB crece como √N. En la configuración de los estudios (Tlife = 0.001, b = 12.5) el sesgo es 0, así que no cambia ningún número publicado; el efecto sobre los estudios es F201.",
+  "fix": "p_i' = (Ns sum_j C_ij q_j + Nb b/T) / total, con la matriz de mezcla periodica C y el fondo por ancho de ventana; CRB con ese p' y N en ventanas.",
+  "script": "scripts/findings/F104_naive_model_windows_leakage.py",
+  "status": "verified",
+  "author": "no verificable",
+  "author_basis": "tools_simulations.py (encabezado: Luciano Masullo, Lucía López y Lars Richter) no está en la lista de originales de NOTAS.txt, así que la autora lo modificó, pero sin historial git no se puede atribuir la línea concreta. El modelo es la Ec. 3.5 de la tesis de Masullo (crb_minflux cita la aproximación de Balzarotti et al. S29, l.651). El comentario de l.423-440 que lo declara 'EXACTAMENTE' el modelo es de la autora (indicio: comentario en español; sin git. El verificador A (r01) sostiene que el comentario 'EXACTAMENTE' (l.423-440) y la ruta rápida de 'p_minflux' son de la autora; el comentario propio de la ruta rápida (l.454-457) está en inglés), y es correcto en el régimen en que ella lo verificó.",
+  "what_was_right": "La autora verificó empíricamente que el fondo uniforme reproduce la Ec. 3.5 con b = dt/K y sin fuga, y eso es exacto (sesgo 0 en la configuración de los estudios; F290-D4). La Ec. 3.5 es el modelo estándar de la literatura; el problema es usarla fuera de ese régimen.",
+  "verified_by": "verifier-A r01: F104 (CONCEPTUAL, l.1041, 649-661, comentario l.433): en el setup medido (tau=4.21, [0,10.1], SBR 21) el sesgo asintotico del MLE de la Ec. 3.5 es 0.85/1.51/1.63/2.69/2.36 nm en las 5 posiciones = 1.04-2.67 veces el CRB de crb_minflux (0.82-1.22 nm); el CRB real es 8.6-13.5 % mayor; la ventana 0 en (5,-5) tiene 45.8 % de fotones de otros haces; SBR 6: 0.59-2.32 nm; solo b=10.1: 0.01-0.48 nm (SBR en ventanas 26.06); configuracion de los estudios: 0. Matices: domina la fuga (con b=12.5 ya da 1.05-2.78 nm); ~2.5 puntos del cociente de CRB vienen de los fotones fuera de las ventanas; no cambia numeros publicados (Tlife=0.001)",
+  "corrections_applied": [
+   {
+    "from": "CRB 0.82–1.22 nm (sesgo 1.0–2.7 CRB)",
+    "to": "1.04–2.67 veces el CRB de crb_minflux, o 0.92–2.45 veces el CRB real",
+    "source": "verifier-A r01 (r01-verifier-A.md, F104)"
+   },
+   {
+    "from": "sin matices",
+    "to": "domina la fuga (con b = 12.5 ya da 1.05–2.78 nm); ~2.5 puntos del cociente de CRB vienen de los fotones fuera de las ventanas; no cambia números publicados (Tlife = 0.001)",
+    "source": "verifier-A r01 (state.json F104) + r02-pi.md"
+   },
+   {
+    "from": "46 % de fotones de otros haces; SBR en ventanas 26.1",
+    "to": "45.8 %; 26.06",
+    "source": "verifier-A r01 (state.json F104)"
+   },
+   {
+    "from": "'verificado por MC: chi2 p = 0.38 mezcla, chi2 = 2559 ingenuo'",
+    "to": "se remite a MIX-VALID (reproducido con otro λ por el verificador A)",
+    "source": "r02-pi.md: números de state.json"
+   }
+  ],
+  "v2_test": "tests/test_estimate.py::TestEstimate::test_mixing_mle_unbiased_at_measured_setup",
+  "v2_tests": [
+   "tests/test_estimate.py::TestEstimate::test_legacy_mle_bias_matches_F104 (antes)",
+   "tests/test_estimate.py::TestEstimate::test_mixing_mle_unbiased_at_measured_setup (después)",
+   "tests/test_simulate.py::TestSimulateMixing::test_low_rate_matches_mixing_window_probs (modelo directo correcto)"
+  ],
+  "v2_fix_status": "pendiente R2 (W2/W3): simulador con fuga y estimador con matriz de mezcla C y fondo b/T. Tests fijados, aún no verificados.",
+  "crimen_inverso": true,
+  "draft_source": "results/findings_A.json (R1, borrador)",
+  "crimen_inverso_note": "Crimen inverso: los estudios simulan con el mismo modelo directo que usa el estimador (sin fuga entre pulsos y con ventanas que cubren el ciclo: Tlife = 0.001 ns, b = dt/K). En ese régimen la Ec. 3.5 es exacta y el MLE alcanza el CRB, así que la simulación no puede detectar el desajuste de modelo que aparece con τ = 4.21 ns y la ventana [0, 10.1] ns medidos (F104). F201 es la otra mitad: el mismo supuesto aplicado a los estudios."
+ },
+ {
+  "id": "F106",
+  "title": "Emisor y MLE atados a la grilla de la PSF: el emisor se ajusta al nodo y el argmax discreto cuantiza",
+  "class": "DISENO",
+  "legacy_location": "legacy/p-minflux-main/tools/tools_simulations.py:444 (λ = psf[i, r0[0], r0[1]]), :93-106 (spaceToIndex), :1099 (argmax)",
+  "scenario": "TCP ideal, fwhm 360, grilla 200 nm / 1 nm, SBR 21. (a) Emisor pedido en (−5.07,−7.56). (b) N = 2095 / 20950 / 104750, emisor en el nodo (5,−5) y fuera del nodo.",
+  "impact": "El emisor pedido en (−5.07,−7.56) se simula en el nodo (−5,−8). En el nodo hay supereficiencia artificial: con N = 104750 el RMSE es 0 (todas las estimaciones caen exactas en el nodo) con un CRB de 0.115 nm. Fuera del nodo la cuantización da RMSE/CRB ~3.3–3.4 con un sesgo de redondeo de ~(−0.25, 0.25) nm.",
+  "fix": "Emisor continuo (lambda evaluado analiticamente o interpolado) y MLE continuo (grilla gruesa + refinamiento); sesgo siempre contra la posicion realmente simulada.",
+  "script": "scripts/findings/F106_grid_emitter_and_mle.py",
+  "status": "verified",
+  "author": "no verificable",
+  "author_basis": "tools_simulations.py (encabezado: Luciano Masullo, Lucía López y Lars Richter) no está en la lista de originales de NOTAS.txt, así que la autora lo modificó, pero sin historial git no se puede atribuir la línea concreta. El diseño de grilla (λ leído en el nodo, argmax discreto) es compatible con el código original; el redondeo de spaceToIndex (comentario en español, l.100-105) es una corrección posterior.",
+  "what_was_right": "spaceToIndex redondea al píxel más cercano en lugar de truncar (corrección verificada en F153) y la autora documentó el término de cuantización px²/12 (curva √(CRB² + px²/12) de su figura de eficiencia).",
+  "verified_by": "verifier-A r01: F106 (DISENO, l.444/93-106/1099): el emisor (-5.07,-7.56) se simula en el nodo (-5,-8); supereficiencia en el nodo (RMSE=0 con N=104750, CRB 0.115 nm); cuantizacion fuera del nodo RMSE/CRB ~3.3-3.4 con sesgo de redondeo ~(-0.25,0.25) nm",
+  "corrections_applied": [
+   {
+    "from": "fuera de nodo RMSE/CRB 3.40, sesgo de redondeo (−0.22, 0.25) nm",
+    "to": "~3.3–3.4 y ~(−0.25, 0.25) nm",
+    "source": "verifier-A r01 (state.json F106)"
+   }
+  ],
+  "v2_test": "tests/test_estimate.py::TestEstimate::test_continuous_offgrid_no_quantization",
+  "v2_tests": [
+   "tests/test_estimate.py::TestEstimate::test_continuous_offgrid_no_quantization"
+  ],
+  "v2_fix_status": "pendiente R2 (W3): λ evaluado en r continuo y MLE continuo acotado. Test fijado, aún no verificado.",
+  "crimen_inverso": false,
+  "draft_source": "results/findings_A.json (R1, borrador)"
+ },
+ {
+  "id": "F107",
+  "title": "sim_exp('p_minflux') ignora t_mask (parpadeo) en silencio",
+  "class": "IMPLEMENTACION",
+  "legacy_location": "legacy/p-minflux-main/tools/tools_simulations.py:454-466 (_photons_ready = True en la ruta rápida), :473-491 (la máscara solo se aplica en la otra ruta)",
+  "scenario": "t_mask = 0 en la primera mitad de M_p = 2e5 ciclos, Ns = 2000, Nb = 0.",
+  "impact": "p_minflux pone el 51.35 % de los fotones en la mitad apagada: la máscara no tiene efecto. Latente: todos los estudios pasan t_mask = None.",
+  "fix": "Aplicar la mascara en la ruta rapida (muestrear ciclos con probabilidad proporcional a t_mask) o lanzar error si t_mask no es None.",
+  "script": "scripts/findings/F107_tmask_ignored_p_minflux.py",
+  "status": "verified",
+  "author": "autora",
+  "author_basis": "indicio: comentario en español; sin git. El verificador A (r01) sostiene que el comentario 'EXACTAMENTE' (l.423-440) y la ruta rápida de 'p_minflux' son de la autora; el comentario propio de la ruta rápida (l.454-457) está en inglés.",
+  "what_was_right": "La ruta rápida es estadísticamente equivalente al multinomial original (exacta por factorización, F152) y ~100 veces más rápida; el comentario de l.473 ('only for cw_minflux / non-fast path') deja a la vista que la máscara solo se aplica en la otra ruta.",
+  "verified_by": "verifier-A r01: F107 (IMPLEMENTACION latente, l.454-466/473-491): sim_exp('p_minflux') ignora t_mask; 51.35 % de los fotones en la mitad apagada. Autoria a confirmar",
+  "corrections_applied": [
+   {
+    "from": "51.4 %",
+    "to": "51.35 %",
+    "source": "verifier-A r01 (state.json F107)"
+   },
+   {
+    "from": "'cw_minflux con la misma máscara: 0'",
+    "to": "se omite: la rama cw quedó sin verificar (F154 unclear)",
+    "source": "verifier-A r01 (state.json F154)"
+   },
+   {
+    "from": "autoría 'la autora (refactor), a confirmar'",
+    "to": "'autora' con base 'indicio: comentario en español; sin git'",
+    "source": "r02-pi.md defaults"
+   }
+  ],
+  "v2_test": null,
+  "v2_tests": [],
+  "v2_fix_status": "no portado a v2: t_mask/blinking queda en el backlog (sin asignar en R2).",
+  "crimen_inverso": false,
+  "draft_source": "results/findings_A.json (R1, borrador)"
+ },
+ {
+  "id": "F108",
+  "title": "cov_ellipse ordena mal los autovectores y no usa el nivel de confianza",
+  "class": "IMPLEMENTACION",
+  "legacy_location": "legacy/p-minflux-main/tools/tools_simulations.py:80-90",
+  "scenario": "Covarianza con desvíos 3 y 1 nm y eje mayor a φ = 0, 30, 60, 120 y 150°; nsig = 1 y 2.",
+  "impact": "Usa vec[order] en lugar de vec[:, order]: el eje mayor sale con un error de −90, −90, −30, +30 y −90° (leído con la convención de matplotlib Ellipse), que no es un cambio de convención constante. Los ejes salen siempre 2 y 6, sin r2. No se usa en ningún script: latente.",
+  "fix": "vec = vec[:, order] con orden descendente, theta = degrees(arctan2(vec[1,0], vec[0,0])), ejes 2*sqrt(r2*val).",
+  "script": "scripts/findings/F108_cov_ellipse.py",
+  "status": "verified",
+  "author": "no verificable",
+  "author_basis": "tools_simulations.py (encabezado: Luciano Masullo, Lucía López y Lars Richter) no está en la lista de originales de NOTAS.txt, así que la autora lo modificó, pero sin historial git no se puede atribuir la línea concreta. El TODO sobre r2 (l.87) ya marcaba la parte del nivel de confianza como pendiente.",
+  "what_was_right": "Los ingredientes son los correctos (autovalores de la covarianza y chi2.ppf para r2), y el propio código dejó un TODO sobre r2. La función no se usa en ningún script, así que no afectó ningún resultado.",
+  "verified_by": "verifier-A r01: F108 (IMPLEMENTACION latente, l.80-90): cov_ellipse usa vec[order] en lugar de vec[:,order]; error del eje mayor -90/-90/-30/+30/-90 grados (convencion matplotlib Ellipse); ejes siempre 2 y 6, sin r2",
+  "corrections_applied": [
+   {
+    "from": "ejes correctos 3.03/9.09 y 4.97/14.92",
+    "to": "se omiten: no figuran en el texto verificado",
+    "source": "r02-pi.md: números de state.json"
+   }
+  ],
+  "v2_test": "tests/test_estimate.py::TestEstimate::test_cov_ellipse_orientation",
+  "v2_tests": [
+   "tests/test_estimate.py::TestEstimate::test_cov_ellipse_orientation"
+  ],
+  "v2_fix_status": "pendiente R2 (W3): cov_ellipse corregido en estimate.py. Test fijado, aún no verificado.",
+  "crimen_inverso": false,
+  "draft_source": "results/findings_A.json (R1, borrador)"
+ },
+ {
+  "id": "F109",
+  "title": "psf(): la rama gaussiana ignora donut_fwhm, la rama SW da NameError y fov_center desplaza x con el signo opuesto a y",
+  "class": "IMPLEMENTACION",
+  "legacy_location": "legacy/p-minflux-main/tools/tools_simulations.py:181-199",
+  "scenario": "psf(d='gaussian', donut_fwhm=250); psf(d='sw'); dona en (0,0) con fov_center = (20,20).",
+  "impact": "La FWHM gaussiana medida es 361 px cuando se piden 250; la rama SW da NameError; con fov_center (20,20) el cero de una dona en (0,0) cae en el índice (120,120): x se desplaza con el signo opuesto a y. Latente: todos los usos son d='donut' con fov_center = [0,0].",
+  "fix": "Pasar el fwhm a gaussian(); quitar la rama SW; x = arange(-size/2 + c_x, ...), y analogo.",
+  "script": "scripts/findings/F109_psf_helper.py",
+  "status": "verified",
+  "author": "no verificable",
+  "author_basis": "tools_simulations.py (encabezado: Luciano Masullo, Lucía López y Lars Richter) no está en la lista de originales de NOTAS.txt, así que la autora lo modificó, pero sin historial git no se puede atribuir la línea concreta.",
+  "what_was_right": "La rama 'donut' con fov_center = [0,0], que es la única que se usa, es consistente con indexToSpace (F153) y respeta donut_fwhm.",
+  "verified_by": "verifier-A r01: F109 (IMPLEMENTACION latente, l.181-199): la rama gaussiana ignora donut_fwhm (FWHM 361 cuando se piden 250); la rama SW da NameError; fov_center desplaza x con el signo opuesto a y (cero de (0,0) en el indice (120,120) con fov_center (20,20))",
+  "corrections_applied": [
+   {
+    "from": "FWHM 361 nm; centro real (−20.5, 20.5)",
+    "to": "361 px; cero de (0,0) en el índice (120,120)",
+    "source": "verifier-A r01 (state.json F109)"
+   },
+   {
+    "from": "autoría 'donut_fwhm lo agregó la autora; SW y fov_center: original, a confirmar'",
+    "to": "no verificable",
+    "source": "r02-pi.md defaults + verifier-A r01 (autoría unclear)"
+   }
+  ],
+  "v2_test": "tests/test_estimate.py::TestPSF::test_fwhm_honored_and_any_K",
+  "v2_tests": [
+   "tests/test_estimate.py::TestPSF::test_fwhm_honored_and_any_K",
+   "tests/test_estimate.py::TestPSF::test_matches_legacy_beams_and_doughnut"
+  ],
+  "v2_fix_status": "pendiente R2 (W3): psf.donut(r, fwhm) respeta la fwhm. Test fijado, aún no verificado.",
+  "crimen_inverso": false,
+  "draft_source": "results/findings_A.json (R1, borrador)"
+ },
+ {
+  "id": "F110",
+  "title": "SBR = inf (sin fondo) da NaN: pos_MINFLUX devuelve la esquina del FOV y crb_minflux NaN, sin aviso",
+  "class": "IMPLEMENTACION",
+  "legacy_location": "legacy/p-minflux-main/tools/tools_simulations.py:1041, :1050, :649-653",
+  "scenario": "TCP ideal, grilla 200/1 nm, emisor (5,−5), cuentas esperadas 1000·p, SBR = inf frente a SBR = 1e12.",
+  "impact": "Con SBR = inf pos_MINFLUX devuelve (−100, 100) y crb_minflux es NaN en toda la grilla; con SBR = 1e12 la estimación es (5,−5). Latente.",
+  "fix": "s = 1 si SBR es inf (o parametrizar por s = Ns/(Ns+Nb)).",
+  "script": "scripts/findings/F110_sbr_infinite.py",
+  "status": "verified",
+  "author": "no verificable",
+  "author_basis": "tools_simulations.py (encabezado: Luciano Masullo, Lucía López y Lars Richter) no está en la lista de originales de NOTAS.txt, así que la autora lo modificó, pero sin historial git no se puede atribuir la línea concreta.",
+  "what_was_right": "Con cualquier SBR finito, incluso 1e12, pos_MINFLUX y crb_minflux funcionan; SBR/(SBR+1) es la parametrización estándar, y el reemplazo NaN → −inf para los bordes con normPSF = 0 es correcto (D-vi).",
+  "verified_by": "verifier-A r01: F110 (IMPLEMENTACION latente, l.1041/1050/649-653): con SBR=inf, pos_MINFLUX devuelve (-100,100) y crb_minflux es NaN en toda la grilla; con 1e12 da (5,-5)",
+  "corrections_applied": [
+   {
+    "from": "'CRB 1.05 nm con SBR = 1e12'",
+    "to": "se omite: no figura en el texto verificado",
+    "source": "r02-pi.md: números de state.json"
+   },
+   {
+    "from": "autoría 'Masullo (expresión original)'",
+    "to": "no verificable",
+    "source": "r02-pi.md defaults + verifier-A r01 (autoría unclear)"
+   }
+  ],
+  "v2_test": "tests/test_estimate.py::TestEstimate::test_sbr_inf",
+  "v2_tests": [
+   "tests/test_estimate.py::TestEstimate::test_sbr_inf"
+  ],
+  "v2_fix_status": "pendiente R2 (W3): sbr = inf sin NaN. Test fijado, aún no verificado.",
+  "crimen_inverso": false,
+  "draft_source": "results/findings_A.json (R1, borrador)"
+ },
+ {
+  "id": "F111",
+  "title": "ebp_centres falla para K ≠ 4: L = [L, L, L, L] tiene largo fijo",
+  "class": "IMPLEMENTACION",
+  "legacy_location": "legacy/p-minflux-main/tools/tools_simulations.py:266",
+  "scenario": "ebp_centres(K, 100, center) con K = 4, 5 y 7, center True y False.",
+  "impact": "K = 5 y K = 7 dan IndexError (con center True y False). Con K = 4 coincide con beams(). Latente: los estudios actuales usan ebp.py.",
+  "fix": "L = np.full(K, L); un solo generador de geometría (ebp.py / psf.beam_positions).",
+  "script": "scripts/findings/F111_ebp_centres_K.py",
+  "status": "verified",
+  "author": "Masullo-original",
+  "author_basis": "docstring '[Lars] This is the new version of the old beams() function' (l.250): L. Richter, coautor del código original según el encabezado de tools_simulations.py; sostenido por el verificador A (r01); sin git",
+  "what_was_right": "Con K = 4 la geometría coincide con beams(). Los comentarios de paridad son correctos: en la rama sin centro literalmente, y en la rama con centro si se leen para Kθ = K − 1 haces periféricos. La autora centralizó la geometría en ebp.py.",
+  "verified_by": "verifier-A r01: F111 (IMPLEMENTACION latente, l.266): ebp_centres da IndexError con K=5 y K=7 (center True y False); con K=4 coincide con beams()",
+  "corrections_applied": [
+   {
+    "from": "título: '... y los comentarios de paridad están invertidos'",
+    "to": "se quita la afirmación de paridad; queda solo el IndexError con K = 5 y K = 7",
+    "source": "verifier-A r01 (state.json F111-comentarios, refuted) + inbox.jsonl ronda 2"
+   },
+   {
+    "from": "fix: '...; corregir comentarios; ...'",
+    "to": "se quita 'corregir comentarios'",
+    "source": "verifier-A r01 (state.json F111-comentarios, refuted)"
+   },
+   {
+    "from": "ubicación ':266, :273-289'",
+    "to": ":266",
+    "source": "verifier-A r01 (state.json F111)"
+   },
+   {
+    "from": "'ángulos 120/240/0 frente a ebp.ideal_positions 210/330/90'",
+    "to": "se omite: no figura en el texto verificado",
+    "source": "r02-pi.md: números de state.json"
+   }
+  ],
+  "v2_test": "tests/test_estimate.py::TestPSF::test_fwhm_honored_and_any_K",
+  "v2_tests": [
+   "tests/test_estimate.py::TestPSF::test_fwhm_honored_and_any_K"
+  ],
+  "v2_fix_status": "pendiente R2 (W3): psf.beam_positions(K, L, center) para K arbitrario. Test fijado, aún no verificado.",
+  "crimen_inverso": false,
+  "draft_source": "results/findings_A.json (R1, borrador)"
+ },
+ {
+  "id": "F201",
+  "title": "Los estudios apagan la fuga entre pulsos (Tlife = 0.001 ns, a = 0, b = dt/K): con τ = 4.21 ns y la ventana [0, 10.1] ns el ideal honesto pasa de |b| ≈ 0.1 nm a ≈ 3 nm y de RMSE/CRB 1.07 a ≈2.5 (contra el CRB con fuga)",
+  "class": "DISENO",
+  "legacy_location": "legacy/p-minflux-main/simulation_misalignment.py:55,99-100; legacy/p-minflux-main/documento/make_fig_eficiencia.py:40,76-77; legacy/p-minflux-main/simulations_example.py:51,134-136 (Masullo, dt = 25, l.47)",
+  "scenario": "Pipeline legado sim_exp + nMINFLUX + pos_MINFLUX, corrido como lo corre la autora (Ns = 2000, Nb = 95, r0 = (−5.07,−7.56) nm, que se simula en el píxel (−5,−8), 1000 muestras, R = 0.75·L_eff). Solo cambian (Tlife, b): C0 = (0.001, 12.5), C1 = (0.001, 10.1), C2 = (4.21, 12.5), C3 = (4.21, 10.1). Semillas 20260825 (la del worker) y 777 (verificador B).",
+  "impact": "Ideal honesto, C0 → C3: |b| 0.06–0.11 → 2.96–2.98 nm; RMSE/CRB 1.07 → 2.73–2.75 contra el CRB sin fuga (0.864 nm) que usa el estudio, o ≈2.5 contra el CRB de un estimador que conoce la fuga (0.945 nm). Se reproduce exactamente con la semilla 20260825 y dentro del ruido con la 777. Realista honesta: |b| 0.13–0.18 → 1.88–1.94 nm. Realista ingenua: 5.4–5.5 → 10.2–10.9 nm (RMSE 13.0 → 24–25 nm). El sesgo asintótico independiente (sin MC) en el ideal C3 es (−1.02, −2.67) nm, |b| = 2.85, y coincide con el MC a 0.1–0.2 nm en los casos honestos. Descomposición: ventana sola 0.30 nm, fuga sola 3.03 nm (domina la fuga). Eficiencia (ideal, SBR 9): RMSE/CRB 0.97 → 1.19 con N = 100 y 0.98 → 1.53 con N = 1600. El supuesto τ ≈ 0 no está declarado en el .docx ni en los scripts, así que la conclusión 'el honesto alcanza el CRB' vale sin fuga pero no para el experimento a 20 MHz.",
+  "fix": "En los estudios, usar el τ medido (4.21 ns) y las ventanas del experimento ([0, 10.1] ns). En el estimador, la verosimilitud con matriz de mezcla C_ij y fondo b/T por ventana (hallazgo del núcleo F104 de W2; simulador y estimador nuevos en R2). Si se quiere una idealización sin fuga, declararla y rotular las conclusiones como 'sin fuga'.",
+  "script": "scripts/findings/F201_leakage_off_in_studies.py",
+  "status": "verified",
+  "author": "autora",
+  "author_basis": "declaración de la autora en NOTAS.txt (sin historial git): NOTAS.txt nombra como originales de L. Masullo solo tools/tools_analysis.py y simulations_example.py; este archivo no está en esa lista (atribución por exclusión). El defecto viene de Masullo: Tlife = 0.001 ya está en simulations_example.py:51 y b = dt/K en :134-136 (setup de 40 MHz, dt = 25), archivo que NOTAS.txt declara original de L. Masullo; la autora lo mantuvo en sus estudios a 20 MHz.",
+  "what_was_right": "sim_exp sí modela la fuga con el pliegue periódico (% dt), que para los conteos equivale a la matriz de mezcla (C_ii = 0.909 y 0.047 del haz anterior con τ = 4.21 y [0, 10.1]). Con Tlife = 0.001 y b = dt/K el fondo reproduce exactamente la Ec. 3.5 (ella lo verificó; F290-D4 lo confirma). La separación honesto/ingenuo e ideal/geom/exp es un buen diseño y la comparación es justa (F290-D7). Ella ya anotó como extensión pendiente 'incorporar drift, blinking, IRF y lifetime medidos' (ESTADO_Y_PLAN_REALISMO_PSF.md:115-117).",
+  "verified_by": "verifier-B r01: F201: con el pipeline legado (sim_exp+nMINFLUX+pos_MINFLUX, Ns=2000, Nb=95, emisor en el píxel (-5,-8), R=0.75·L_eff, 1000 muestras), pasar de (Tlife=0.001, b=12.5) a (τ=4.21 ns, [0,10.1] ns) lleva el ideal honesto de |b| 0.06–0.11 a 2.96–2.98 nm y RMSE/CRB(sin fuga, 0.864) de 1.07 a 2.73–2.75; se reproduce exactamente con la semilla 20260825 y dentro del ruido con la semilla 777; realista honesta 0.13–0.18 -> 1.88–1.94 nm; realista ingenua 5.4–5.5 -> 10.2–10.9 nm (RMSE 13.0 -> 24–25) || F201: el sesgo asintótico independiente (C propia: C_ii=0.9092, del haz anterior 0.0467; conteos esperados; argmax subpíxel) da (-1.02,-2.67) nm, |b|=2.85, en el ideal C3 y coincide con el MC a 0.1–0.2 nm en los casos honestos; ventana sola 0.30 nm, fuga sola 3.03 nm (domina la fuga) || F201: barrido de eficiencia (ideal, SBR 9): RMSE/CRB sube con la fuga, 0.97->1.19 con N=100 y 0.98->1.53 con N=1600 (semilla propia); los 1.23/1.65 del worker son compatibles dentro del ruido MC",
+  "corrections_applied": [
+   {
+    "from": "clase CONCEPTUAL",
+    "to": "DISENO",
+    "source": "inbox.jsonl ronda 2 (recomendación de verifier-B r01)"
+   },
+   {
+    "from": "RMSE/CRB 2.75 (CRB 0.864 nm); título '~2.9 nm (3.4 CRB) y RMSE/CRB 2.75'",
+    "to": "2.73–2.75 contra el CRB sin fuga (0.864 nm); ≈2.5 contra el CRB con fuga (0.945 nm)",
+    "source": "verifier-B r01 (state.json F201 clase, unclear) + inbox.jsonl ronda 2"
+   },
+   {
+    "from": "'sin declararlo' (class_note)",
+    "to": "'no declarado en el .docx ni en los scripts' + crédito a ESTADO_Y_PLAN_REALISMO_PSF.md:115-117",
+    "source": "verifier-B r01 + r02-pi.md"
+   },
+   {
+    "from": "|b| 0.11 → 2.98; realista honesta 0.18 → 1.94; realista ingenua 5.5 → 10.8, RMSE 13.0 → 24.8",
+    "to": "rangos de las dos semillas: 0.06–0.11 → 2.96–2.98; 0.13–0.18 → 1.88–1.94; 5.4–5.5 → 10.2–10.9, RMSE 13.0 → 24–25",
+    "source": "verifier-B r01 (state.json F201)"
+   },
+   {
+    "from": "descomposición ≈0.25 / ≈3.1 nm; asintótico (−0.98, −2.75)",
+    "to": "0.30 / 3.03 nm; (−1.02, −2.67), |b| = 2.85",
+    "source": "verifier-B r01 (state.json F201)"
+   },
+   {
+    "from": "eficiencia N = 100 0.97 → 1.23, N = 1600 1.06 → 1.65",
+    "to": "0.97 → 1.19 y 0.98 → 1.53 (semilla del verificador; los del worker son compatibles dentro del ruido MC)",
+    "source": "verifier-B r01 (state.json F201)"
+   }
+  ],
+  "v2_test": "tests/test_simulate.py::TestSimulateLegacy::test_short_lifetime_turns_off_leakage",
+  "v2_tests": [
+   "tests/test_simulate.py::TestSimulateLegacy::test_short_lifetime_turns_off_leakage"
+  ],
+  "v2_fix_status": "pendiente R2 (W2/W3): el comparativo legado contra v2 corre con τ = 4.21 y [0, 10.1]; repetir el estudio de desalineación con v2 queda opcional para R3.",
+  "crimen_inverso": true,
+  "draft_source": "results/findings_B.json (R1, borrador)",
+  "crimen_inverso_note": "Crimen inverso: los estudios simulan con el mismo modelo directo que usa el estimador (sin fuga entre pulsos y con ventanas que cubren el ciclo: Tlife = 0.001 ns, b = dt/K). En ese régimen la Ec. 3.5 es exacta y el MLE alcanza el CRB, así que la simulación no puede detectar el desajuste de modelo que aparece con τ = 4.21 ns y la ventana [0, 10.1] ns medidos (F104). F201 es la otra mitad: el mismo supuesto aplicado a los estudios."
+ },
+ {
+  "id": "F202",
+  "title": "realistic_ebp normaliza cada PSF por su propio máximo y descarta intensity_scale: si el máximo del .npy refleja la potencia del haz, el modelo 'realista' pierde potencias relativas de hasta ×1.379, que en p-MINFLUX fijan p_i",
+  "class": "DISENO",
+  "legacy_location": "legacy/p-minflux-main/tools/realistic_ebp.py:100-103 (target = image/scale), 152 (intensity_scale se guarda y no se usa), 181-185 (ebp_realistic), docstring 5-6; legacy/p-minflux-main/analyze_realistic_psf.py:122-140",
+  "scenario": "Escalera de modelos reconstruida desde fit_parameters.csv (se reproduce comparison_metrics.csv al 4.º decimal con la semilla 20260901). Después, a cada PSF se le aplica su intensity_scale (21.02, 16.65, 22.96, 22.86; máx/mín 1.379). Supuesto explícito: el máximo de cada .npy refleja la potencia relativa del haz (× la eficiencia de detección). Lo apoya que el orden de los máximos se repite en las 3 calibraciones disponibles (20260703: 245/205/291/253; 20260707: 6.4/4.8/6.8/5.3; 20260924: 21.2/18.4/26.6/19.7), pero sigue siendo un supuesto a confirmar con la autora.",
+  "impact": "Bajo ese supuesto, p_señal en el emisor pasa de [0.111, 0.262, 0.314, 0.313] a [0.111, 0.207, 0.342, 0.340]. El CRB casi no cambia (2.348 → 2.333 nm), pero el estimador realista sin potencias sobre datos con potencias queda sesgado 10.6 nm (asintótico 10.60, MC 10.65). Sin depender del supuesto: la etapa 'experimental' de la escalera usa los .npy crudos con su escala y las demás no, así que el salto 9.66 → 35.6 nm mezcla la estructura no modelada con este cambio de normalización. El docstring (realistic_ebp.py:5-6) declara unidades relativas al máximo de cada PSF: el código hace lo que dice, y por eso es DISENO.",
+  "fix": "Reconstruir cada PSF como intensity_scale·(pedestal + A·D_k + gradiente), o ajustar sin normalizar, y validar p_i(r0) del modelo contra las PSF medidas. Reportar las potencias relativas como un parámetro más de la escalera.",
+  "script": "scripts/findings/F202_realistic_ebp_drops_beam_power.py",
+  "status": "verified",
+  "author": "autora",
+  "author_basis": "declaración de la autora en NOTAS.txt (sin historial git): NOTAS.txt nombra como originales de L. Masullo solo tools/tools_analysis.py y simulations_example.py; este archivo no está en esa lista (atribución por exclusión).",
+  "what_was_right": "Ajuste 2D robusto (soft-L1) con el centro refinado localmente, separación explícita pedestal/fondo Nb, escalera reproducible con semilla (se reproduce al 4.º decimal) y MC rápido equivalente a pos_MINFLUX. Ella misma recomienda 'permitir distinta potencia entre haces' (ESTADO_Y_PLAN_REALISMO_PSF.md:116) y advierte que las elipticidades son 'parámetros efectivos'; el aporte nuevo es cuantificarlo y mostrar que contamina la escalera.",
+  "verified_by": "verifier-B r01: F202: realistic_ebp normaliza cada PSF por su máximo y no usa intensity_scale (realistic_ebp.py:100-103,152,181-185); escalas con máx/mín 1.379; p_señal [0.111,0.262,0.314,0.313]->[0.111,0.207,0.342,0.340]; CRB 2.348->2.333 nm; el estimador realista sin potencias sobre datos con potencias queda sesgado 10.6 nm (asintótico 10.60, MC 10.65); la escalera de comparison_metrics.csv se reproduce al 4.º decimal",
+  "corrections_applied": [
+   {
+    "from": "clase IMPLEMENTACION",
+    "to": "DISENO",
+    "source": "inbox.jsonl ronda 2 + verifier-B r01 (state.json F202 clase, refuted)"
+   },
+   {
+    "from": "supuesto 'máximo del .npy = potencia' solo en el reporte del worker",
+    "to": "explícito en scenario e impact, con el orden repetido en 3 calibraciones",
+    "source": "verifier-B r01 (state.json F202 clase, refuted) + inbox.jsonl ronda 2"
+   },
+   {
+    "from": "sin crédito",
+    "to": "crédito a ESTADO_Y_PLAN_REALISMO_PSF.md:116 ('permitir distinta potencia entre haces')",
+    "source": "verifier-B r01 + inbox.jsonl ronda 2"
+   },
+   {
+    "from": "'el estimador de geometría pasa de |b| 5.1 a 8.8 nm'",
+    "to": "se omite (el verificador obtuvo 8.5 en MC; no figura en el texto verificado)",
+    "source": "verifier-B r01 (r01-verifier-B.md F202)"
+   }
+  ],
+  "v2_test": "tests/test_estimate.py::TestEstimate::test_free_powers_removes_bias",
+  "v2_tests": [
+   "tests/test_estimate.py::TestEstimate::test_free_powers_removes_bias"
+  ],
+  "v2_fix_status": "pendiente R2 (W3): mle_mixing(free_powers=True) y beam_powers en simulate. Test fijado, aún no verificado.",
+  "crimen_inverso": false,
+  "draft_source": "results/findings_B.json (R1, borrador)"
+ },
+ {
+  "id": "F203",
+  "title": "En los casos ingenuos (y en los honestos con N bajo) el RMSE y el |sesgo| dependen del radio de búsqueda R; no se reporta la fracción de estimaciones en el borde; la tabla mezcla un RMSE por eje con un |sesgo| 2D",
+  "class": "DISENO",
+  "legacy_location": "legacy/p-minflux-main/simulation_misalignment.py:75,178,222-232,265-277; legacy/p-minflux-main/documento/make_fig_eficiencia.py:44,89,118-125; legacy/p-minflux-main/analyze_realistic_psf.py:88,147",
+  "scenario": "Casos 'Realista ingenua' y 'Experimental ingenua' (sustituto medido 20260703, rotulado como tal) variando solo R_SEARCH_FACTOR ∈ {0.5, 0.75, 1.0, 1.25}·L; 1000 muestras; N = 2095 y N = 100 (SBR 9).",
+  "impact": "Realista ingenua (N = 2095): RMSE 12.1 / 13.2 / 50.0 / 81.9 nm con el 0 / 1 / 50 / 87 % en el borde para R = 0.5 / 0.75 / 1.0 / 1.25·L. Sustituto 20260703 ingenuo: |b| 48 / 72 / 96 / 118 nm ≈ R − |r0|, con el 100 % de las estimaciones en el borde solo para R ≤ 1.0·L (71–72 % con R = 1.25·L). Con el R de la autora (0.75·L) y el EBP realista, el ingenuo tiene solo un 1 % en el borde: 'lo fija R' vale para el sustituto experimental y para R ≥ 1.0·L. Con N = 100 incluso el honesto depende de R (realista 12–26 nm). Métrica: en el log |b| = 62.76 nm > RMSE = 46.96 nm porque el RMSE es por eje y |b| es la norma 2D.",
+  "fix": "Reportar la fracción en el borde y un barrido en R (o usar un prior suave en vez de un corte duro); para los ingenuos, informar el sesgo condicionado a estimaciones interiores o la mediana. Usar una sola convención (RMSE 2D junto a |b| 2D, o todo por eje).",
+  "script": "scripts/findings/F203_naive_rmse_set_by_search_disk.py",
+  "status": "verified",
+  "author": "autora",
+  "author_basis": "declaración de la autora en NOTAS.txt (sin historial git): NOTAS.txt nombra como originales de L. Masullo solo tools/tools_analysis.py y simulations_example.py; este archivo no está en esa lista (atribución por exclusión). Ella introdujo r_max_nm, que corrige la búsqueda sin cota; lo discutible es cómo se reportan los números.",
+  "what_was_right": "Acotar la búsqueda es físicamente correcto (MINFLUX estima localmente) y corrigió máximos espurios; el radio sale del tamaño del patrón y es el mismo en todos los casos, así que la comparación es justa (F290-D7).",
+  "verified_by": "verifier-B r01: F203: el RMSE y el |b| de los ingenuos dependen de R: realista ingenua RMSE 12.1/13.2/50.0/81.9 nm con 0/1/50/87 % en el borde para R=0.5/0.75/1/1.25·L; sustituto 20260703 ingenuo |b| 48/72/96/118 ≈ R−|r0|; el honesto con N=100 también depende de R (realista 12–26 nm); en el log |b|=62.76 > RMSE=46.96 porque el RMSE es por eje",
+  "corrections_applied": [
+   {
+    "from": "'el 100 % de las estimaciones ingenuas queda en el borde para los cuatro R'",
+    "to": "100 % en el borde solo para R ≤ 1.0·L (71–72 % con 1.25·L); con R = 0.75 y el EBP realista el ingenuo tiene un 1 % en el borde",
+    "source": "verifier-B r01 (state.json F203, refuted) + inbox.jsonl ronda 2"
+   },
+   {
+    "from": "realista ingenua RMSE 12.1/13.9/51.0/82.1 nm con 0/1.8/52/87 % en el borde",
+    "to": "12.1/13.2/50.0/81.9 nm con 0/1/50/87 %",
+    "source": "verifier-B r01 (state.json F203)"
+   },
+   {
+    "from": "|b| 48/72/96/119; honesto N = 100 11.4–23.4 (realista) y 14.6–41.4 (sustituto)",
+    "to": "|b| 48/72/96/118; honesto realista 12–26 nm",
+    "source": "verifier-B r01 (state.json F203)"
+   }
+  ],
+  "v2_test": "tests/test_estimate.py::TestEstimate::test_boundary_fraction_reported",
+  "v2_tests": [
+   "tests/test_estimate.py::TestEstimate::test_boundary_fraction_reported"
+  ],
+  "v2_fix_status": "pendiente R2 (W3): el estimador devuelve la bandera 'en el borde' y el comparativo informa la fracción. Test fijado, aún no verificado.",
+  "crimen_inverso": false,
+  "draft_source": "results/findings_B.json (R1, borrador)"
+ },
+ {
+  "id": "F204",
+  "title": "Los errores estándar suponen estimaciones normales (std/√(2n), RMSE/√(2n)): con N = 100 y un EBP con pedestal el SE real de RMSE/CRB es 1.6–1.9 veces el impreso; el |sesgo| no descuenta su piso de ruido",
+  "class": "DISENO",
+  "legacy_location": "legacy/p-minflux-main/simulation_misalignment.py:239-241,270-277; legacy/p-minflux-main/documento/make_fig_eficiencia.py:124-131",
+  "scenario": "El punto N = 100 de make_fig_eficiencia (SBR 9, r0 = (5,−5), 250 muestras) replicado 400 veces con semillas independientes; se compara la dispersión real de cada estadístico con el SE que imprime el script.",
+  "impact": "SE real / SE impreso de RMSE/CRB = 1.88 (realistic_fit), 1.63 (sustituto 20260703) y 0.77 (ideal, donde el SE impreso es conservador). Exceso de curtosis de las estimaciones: 6.6/4.6 (realista) contra 0.2/0.1 (ideal). Piso de ruido de |b| en el ideal ≈0.36 nm con n = 250. Extrapolación desde EBP sustitutos (no medida con las PSF 20260820, que no están): su '1.89 ± 0.08' pasaría a ± ~0.13–0.15; la conclusión cualitativa se sostiene.",
+  "fix": "SE por bootstrap (o réplicas con semillas independientes) para std, RMSE y RMSE/CRB; reportar |b| con el piso restado o un test de Hotelling de sesgo = 0; reportar la curtosis o la fracción en el borde junto a la σ.",
+  "script": "scripts/findings/F204_standard_errors_gaussian_assumption.py",
+  "status": "verified",
+  "author": "autora",
+  "author_basis": "declaración de la autora en NOTAS.txt (sin historial git): NOTAS.txt nombra como originales de L. Masullo solo tools/tools_analysis.py y simulations_example.py; este archivo no está en esa lista (atribución por exclusión). Agregar SE fue una mejora de ella sobre el original, que no tenía incertidumbres.",
+  "what_was_right": "Semillas fijas y SE reportados en todos los estadísticos, que el código original no tenía; la curva de cuantización √(CRB² + px²/12) de la figura explica bien el ascenso del ideal a N alto.",
+  "verified_by": "verifier-B r01: F204: con N=100 (SBR 9, 250 muestras), SE real/SE impreso de RMSE/CRB = 1.88 (realistic_fit), 1.63 (sustituto 20260703) y 0.77 (ideal); exceso de curtosis 6.6/4.6 (realista) contra 0.2/0.1 (ideal); piso de ruido de |b| en el ideal ≈0.36 nm con n=250. El '±0.13–0.15' para su 1.89 es una extrapolación desde sustitutos",
+  "corrections_applied": [
+   {
+    "from": "'Su 1.89 ± 0.08 pasa a ± ~0.13–0.15'",
+    "to": "rotulado como extrapolación desde EBP sustitutos",
+    "source": "verifier-B r01 (state.json F204) + inbox.jsonl ronda 2"
+   },
+   {
+    "from": "SE real/impreso 1.86 / 1.55 / 0.74; curtosis 6.8/4.7; piso 0.34 nm",
+    "to": "1.88 / 1.63 / 0.77; 6.6/4.6; ≈0.36 nm",
+    "source": "verifier-B r01 (state.json F204)"
+   },
+   {
+    "from": "'la no monotonía 1.20 (N = 200) / 1.27 (N = 400) queda dentro del ruido'",
+    "to": "se omite: el verificador no la comprobó por separado (faltan las PSF reales)",
+    "source": "verifier-B r01 (r01-verifier-B.md F204)"
+   }
+  ],
+  "v2_test": "tests/test_estimate.py::TestCompare::test_compare_json_complete",
+  "v2_tests": [
+   "tests/test_estimate.py::TestCompare::test_compare_json_complete (SE bootstrap)"
+  ],
+  "v2_fix_status": "pendiente R2 (W3): el comparativo reporta SE bootstrap de cada métrica. Test fijado, aún no verificado.",
+  "crimen_inverso": false,
+  "draft_source": "results/findings_B.json (R1, borrador)"
+ },
+ {
+  "id": "F205",
+  "title": "El sesgo se mide contra R0_NM = (−5.07, −7.56) pero el emisor se simula en el píxel (−5, −8): el desplazamiento de 0.4455 nm aparece como sesgo espurio (|b| 0.43 contra 0.02 nm) y además invierte el orden honesto/ingenuo",
+  "class": "IMPLEMENTACION",
+  "legacy_location": "legacy/p-minflux-main/simulation_misalignment.py:67,177,230,256; legacy/p-minflux-main/analyze_realistic_psf.py:36-37,87-88,145-146; núcleo: sim_exp lee psf[:, r0[0], r0[1]] (F106)",
+  "scenario": "Casos honestos e ingenuos con N = 2095 y 1e5 muestras (multinomial, equivalente a sim_exp en C0); sesgo medido contra R0_NM y contra el píxel realmente simulado.",
+  "impact": "R0_NM = (−5.07, −7.56) se simula en el píxel (−5, −8), un desplazamiento de 0.4455 nm. El |b| honesto ideal es 0.43 nm contra R0 y 0.02 contra el píxel; con 1000 muestras el SE de |b| es ≈0.04, así que el artefacto está a ~10σ. La geométrica ingenua da 0.31 contra R0 y 0.67 contra el píxel: el orden honesto/ingenuo se invierte según la referencia. La diferencia vectorial (−0.35, 0.56) nm no depende de la referencia. Impacto extra: el RMSE de la escalera también se calcula contra R0 (analyze_realistic_psf.py:88) y pasa de 0.912 a 0.960 nm en el ideal. run_final.log (r0 = (5,−5), entero) no está afectado.",
+  "fix": "Usar como verdad grid.to_space(r0_idx) (o simular el emisor con λ interpolado en r0 exacto, lo que corrige el núcleo en R2); reportar sesgos como vectores o diferencias pareadas entre casos.",
+  "script": "scripts/findings/F205_emitter_snapped_to_pixel.py",
+  "status": "verified",
+  "author": "autora",
+  "author_basis": "declaración de la autora en NOTAS.txt (sin historial git): NOTAS.txt nombra como originales de L. Masullo solo tools/tools_analysis.py y simulations_example.py; este archivo no está en esa lista (atribución por exclusión). Ella cambió R0_NM a la localización experimental no entera (simulation_misalignment.py:67, analyze_realistic_psf.py:36-37); el redondeo a la grilla del núcleo es F106 (no verificable).",
+  "what_was_right": "Ella corrigió spaceToIndex para que redondee en lugar de truncar (F153) y usa el mismo r0 y la misma grilla en todos los casos, así que las diferencias vectoriales entre casos son correctas.",
+  "verified_by": "verifier-B r01: F205: R0_NM=(-5.07,-7.56) se simula en el píxel (-5,-8) (desplazamiento 0.4455 nm); el |b| honesto ideal es 0.43 contra R0 y 0.02 contra el píxel (1e5 muestras); la geométrica ingenua es 0.31 contra R0 y 0.67 contra el píxel, así que el orden honesto/ingenuo se invierte; la diferencia vectorial (-0.35,0.56) no depende de la referencia. Impacto extra: el RMSE de la escalera también se calcula contra R0 (analyze_realistic_psf.py:88) y pasa de 0.912 a 0.960 nm en el ideal",
+  "corrections_applied": [
+   {
+    "from": "sin el impacto en el RMSE",
+    "to": "impacto extra: RMSE de la escalera 0.912 → 0.960 nm (analyze_realistic_psf.py:88)",
+    "source": "verifier-B r01 (state.json F205) + inbox.jsonl ronda 2"
+   },
+   {
+    "from": "|b| 0.437 / 0.012 (ideal), 0.302 / 0.663 (geom ingenua); título '0.445 nm'",
+    "to": "0.43 / 0.02 y 0.31 / 0.67; 0.4455 nm",
+    "source": "verifier-B r01 (state.json F205)"
+   },
+   {
+    "from": "'los honest_bias_nm de comparison_metrics.csv (0.434 … 0.519) son casi enteramente este artefacto'",
+    "to": "se omite: no figura en el texto verificado",
+    "source": "r02-pi.md: números de state.json"
+   }
+  ],
+  "v2_test": "tests/test_estimate.py::TestEstimate::test_continuous_offgrid_no_quantization",
+  "v2_tests": [
+   "tests/test_estimate.py::TestEstimate::test_continuous_offgrid_no_quantization"
+  ],
+  "v2_fix_status": "pendiente R2 (W3): emisor con λ en r continuo y sesgo contra la posición simulada. Test fijado, aún no verificado.",
+  "crimen_inverso": false,
+  "draft_source": "results/findings_B.json (R1, borrador)"
+ },
+ {
+  "id": "F206",
+  "title": "La cadena que arma el documento (run_and_save → run_final.log → build_doc) ya no lo reproduce: el script, el log y los parámetros escritos a mano corresponden a configuraciones distintas",
+  "class": "DISENO",
+  "legacy_location": "legacy/p-minflux-main/documento/build_doc.py:19,30-41,535-537,812-821; legacy/p-minflux-main/documento/run_and_save.py:57; legacy/p-minflux-main/simulation_misalignment.py:50,57,67,96",
+  "scenario": "Chequeo estático (ast y regex) de simulation_misalignment.py, run_final.log y build_doc.py.",
+  "impact": "5 discrepancias: 1000 muestras (script) contra 300 (log); r0 (−5.07,−7.56) contra (5,−5); Ns/Nb 2000/95 contra 90/10 (el CRB 4.28 nm del log corresponde a N = 100); INCLUDE_REALISTIC_FIT = True sin filas 'Realista' en el log; y CASES incluye 'Experimental ingenua 1/2', que tampoco están en el log. Los parámetros están escritos a mano en build_doc.py:535-537 y 812-821. Si hoy se corre la cadena, el .docx sale con números de una configuración y parámetros de otra.",
+  "fix": "Que el script escriba un JSON con la configuración completa (semilla, versión) junto a la tabla, y que build_doc tome de ahí los parámetros (§5 y tabla 9.1) en vez de escribirlos a mano; que falle si no coinciden.",
+  "script": "scripts/findings/F206_doc_numbers_vs_scripts.py",
+  "status": "verified",
+  "author": "autora",
+  "author_basis": "declaración de la autora en NOTAS.txt (sin historial git): NOTAS.txt nombra como originales de L. Masullo solo tools/tools_analysis.py y simulations_example.py; este archivo no está en esa lista (atribución por exclusión).",
+  "what_was_right": "El Tee de stdout a log y la cadena documentada en el encabezado de build_doc son buena práctica de trazabilidad, eficiencia.log es reproducible, y ella ya advierte que los logs vienen de configuraciones distintas y que hay que guardar configuración, semilla y versión junto a cada resultado (ESTADO_Y_PLAN_REALISMO_PSF.md:64-67).",
+  "verified_by": "verifier-B r01: F206: la cadena run_and_save -> run_final.log -> build_doc no reproduce el documento: 1000 vs 300 muestras, r0 (-5.07,-7.56) vs (5,-5), Ns/Nb 2000/95 vs 90/10, casos Realista (y 'Experimental ingenua 1/2') ausentes del log, parámetros escritos a mano en build_doc.py:535-537 y 812-821; la autora ya lo advierte en ESTADO…md:64-67",
+  "corrections_applied": [
+   {
+    "from": "4 discrepancias",
+    "to": "5: se agrega CASES con 'Experimental ingenua 1/2' ausentes del log",
+    "source": "verifier-B r01 (state.json F206) + inbox.jsonl ronda 2"
+   }
+  ],
+  "v2_test": "tests/test_estimate.py::TestCompare::test_compare_json_complete",
+  "v2_tests": [
+   "tests/test_estimate.py::TestCompare::test_compare_json_complete (todos los parámetros en el JSON)"
+  ],
+  "v2_fix_status": "pendiente R2 (W3): compare_legacy_vs_v2.json registra parámetros, semillas, versión y source. Test fijado, aún no verificado.",
+  "crimen_inverso": false,
+  "draft_source": "results/findings_B.json (R1, borrador)"
+ }
+]
