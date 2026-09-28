@@ -2,8 +2,6 @@
 # agent-team job data is local state (delete these lines to version it)
 jobs/*
 !jobs/.gitkeep
-equipo/*
-!equipo/.gitkeep
 agent-team/policy.json
 __pycache__/
 # --- /agent-team ---

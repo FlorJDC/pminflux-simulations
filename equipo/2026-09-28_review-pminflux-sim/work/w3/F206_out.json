@@ -1,0 +1,49 @@
+{
+ "simulation_misalignment.py": {
+  "Ns": "2000",
+  "Nb": "95",
+  "dt": "50",
+  "Tlife": "0.001",
+  "samples": "1000",
+  "SEED": "20260825",
+  "R0_NM": "np.array([-5.07, -7.56])",
+  "INCLUDE_REALISTIC_FIT": "True"
+ },
+ "run_final.log": {
+  "r0": " 5. -5.",
+  "samples": "300",
+  "cases": [
+   "Ideal",
+   "Geom. medida honesta",
+   "Geom. medida ingenua",
+   "Experimental honesta",
+   "Experimental ingenua"
+  ],
+  "crb": [
+   [
+    "ideal",
+    "4.28"
+   ],
+   [
+    "geom_exp",
+    "4.32"
+   ],
+   [
+    "exp",
+    "9.69"
+   ]
+  ]
+ },
+ "build_doc.py_hardcoded": {
+  "Ns / Nb '90 / 10'": true,
+  "muestras '300'": true,
+  "r0 '(5, −5) nm'": true,
+  "texto §5 'Trescientas ... Ns = 90 ... Nb = 10'": true
+ },
+ "mismatches": [
+  "muestras 1000 (script) vs 300 (log)",
+  "r0 np.array([-5.07, -7.56]) (script) vs [ 5. -5.] (log)",
+  "Ns/Nb 2000/95 (script) vs 90/10 (build_doc y CRB 4.28 nm del log = N 100)",
+  "INCLUDE_REALISTIC_FIT=True pero el log no tiene filas \"Realista\""
+ ]
+}

@@ -1,0 +1,198 @@
+{
+ "reproduction": {
+  "geometry": {
+   "crb": 0.8388829131160098,
+   "honest": {
+    "rmse": 0.9122042899847965,
+    "bias": 0.4342298418528555,
+    "bias_xy": [
+     0.09666666666666668,
+     -0.4233333333333338
+    ],
+    "frac_on_search_edge": 0.0
+   },
+   "geometry_est": {
+    "rmse": 0.9882729042796498,
+    "bias": 0.4607722985500659,
+    "bias_xy": [
+     0.026666666666667282,
+     -0.45999999999999996
+    ],
+    "frac_on_search_edge": 0.0
+   },
+   "ref": {
+    "crb_at_emitter_nm": 0.8388829131160098,
+    "honest_rmse_nm": 0.9122042899847965,
+    "geometry_estimator_rmse_nm": 0.9882729042796498,
+    "geometry_estimator_bias_nm": 0.4607722985500659
+   }
+  },
+  "individual_width": {
+   "crb": 0.8381671571297704,
+   "honest": {
+    "rmse": 0.930958287644153,
+    "bias": 0.3837244381642184,
+    "bias_xy": [
+     0.05333333333333368,
+     -0.3800000000000008
+    ],
+    "frac_on_search_edge": 0.0
+   },
+   "geometry_est": {
+    "rmse": 2.1650057736643573,
+    "bias": 2.799464234456301,
+    "bias_xy": [
+     2.37,
+     -1.490000000000001
+    ],
+    "frac_on_search_edge": 0.0
+   },
+   "ref": {
+    "crb_at_emitter_nm": 0.8381671571297704,
+    "honest_rmse_nm": 0.930958287644153,
+    "geometry_estimator_rmse_nm": 2.1650057736643573,
+    "geometry_estimator_bias_nm": 2.799464234456301
+   }
+  },
+  "pedestal": {
+   "crb": 1.759878608857533,
+   "honest": {
+    "rmse": 1.8191802183034715,
+    "bias": 0.47375568011839647,
+    "bias_xy": [
+     0.11333333333333329,
+     -0.45999999999999996
+    ],
+    "frac_on_search_edge": 0.0
+   },
+   "geometry_est": {
+    "rmse": 7.951351038240818,
+    "bias": 6.340277771692832,
+    "bias_xy": [
+     -0.9633333333333329,
+     -6.266666666666667
+    ],
+    "frac_on_search_edge": 0.0
+   },
+   "ref": {
+    "crb_at_emitter_nm": 1.759878608857533,
+    "honest_rmse_nm": 1.8191802183034715,
+    "geometry_estimator_rmse_nm": 7.951351038240818,
+    "geometry_estimator_bias_nm": 6.340277771692832
+   }
+  },
+  "ellipticity": {
+   "crb": 2.427628952228437,
+   "honest": {
+    "rmse": 2.4835357859310183,
+    "bias": 0.5229828975321394,
+    "bias_xy": [
+     -0.09999999999999964,
+     -0.5133333333333345
+    ],
+    "frac_on_search_edge": 0.0
+   },
+   "geometry_est": {
+    "rmse": 9.093984275332788,
+    "bias": 12.757828097986655,
+    "bias_xy": [
+     5.266666666666667,
+     -11.620000000000001
+    ],
+    "frac_on_search_edge": 0.0
+   },
+   "ref": {
+    "crb_at_emitter_nm": 2.427628952228437,
+    "honest_rmse_nm": 2.4835357859310183,
+    "geometry_estimator_rmse_nm": 9.093984275332788,
+    "geometry_estimator_bias_nm": 12.757828097986655
+   }
+  },
+  "background": {
+   "crb": 2.3483319158003795,
+   "honest": {
+    "rmse": 2.3923384654628896,
+    "bias": 0.5191873992650011,
+    "bias_xy": [
+     0.11333333333333329,
+     -0.5066666666666668
+    ],
+    "frac_on_search_edge": 0.0
+   },
+   "geometry_est": {
+    "rmse": 9.656090478725504,
+    "bias": 5.418691929074971,
+    "bias_xy": [
+     -1.793333333333333,
+     -5.113333333333334
+    ],
+    "frac_on_search_edge": 0.0
+   },
+   "ref": {
+    "crb_at_emitter_nm": 2.3483319158003795,
+    "honest_rmse_nm": 2.3923384654628896,
+    "geometry_estimator_rmse_nm": 9.656090478725504,
+    "geometry_estimator_bias_nm": 5.418691929074971
+   }
+  }
+ },
+ "with_beam_power": {
+  "background_as_author": {
+   "crb": 2.3483319158003795,
+   "honest": {
+    "rmse": 2.3730950254888654,
+    "bias": 0.44319070387362647,
+    "bias_xy": [
+     0.0129999999999999,
+     -0.4430000000000005
+    ],
+    "frac_on_search_edge": 0.0
+   },
+   "geometry_est": {
+    "rmse": 9.903821484659344,
+    "bias": 5.084664984047621,
+    "bias_xy": [
+     -2.117,
+     -4.623
+    ],
+    "frac_on_search_edge": 0.002
+   }
+  },
+  "background_with_power": {
+   "crb": 2.332800100029341,
+   "honest": {
+    "rmse": 2.4342062361270873,
+    "bias": 0.41889616851912115,
+    "bias_xy": [
+     -0.056999999999999496,
+     -0.41500000000000004
+    ],
+    "frac_on_search_edge": 0.0
+   },
+   "geometry_est": {
+    "rmse": 9.31596854868027,
+    "bias": 8.813862093316414,
+    "bias_xy": [
+     -6.382,
+     -6.079
+    ],
+    "frac_on_search_edge": 0.0
+   }
+  },
+  "gen_power_est_author_model": {
+   "rmse": 7.962164906606746,
+   "bias": 10.560402454452197,
+   "bias_xy": [
+    -10.532,
+    -0.774
+   ],
+   "frac_on_search_edge": 0.0
+  }
+ },
+ "p_rel_change": [
+  -0.0016846084039262577,
+  -0.2092399782426414,
+  0.09031833931710542,
+  0.08530937185957388
+ ]
+}
