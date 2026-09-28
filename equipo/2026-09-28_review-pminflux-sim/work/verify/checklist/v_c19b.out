@@ -1,0 +1,3 @@
+(-5,-8) interleaved t=100000 ns: sigma_fl 6.462e-04 nm CRB 0.8635 ratio 7.48e-04
+(-5,-8) interleaved t=1000 ns: sigma_fl 6.396e-03 nm CRB 0.8635 ratio 7.41e-03
+(-5,-8) sequential 25x(4x100us): 2.596 nm ratio 3.01

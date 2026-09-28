@@ -1,8 +1,8 @@
 {
  "id": "2026-09-28_review-pminflux-sim",
  "type": "feature+derive",
- "status": "active",
- "round": 2,
+ "status": "done",
+ "round": 3,
  "rounds_budget": 3,
  "worker_count": 3,
  "team": {
@@ -743,20 +743,146 @@
    "text": "mixing_validation.json:variant_Nb0 (lambda de W1, Nb=0, 2.07e6 fotones) da p=0.0078 para la mezcla (-2.9 SE en w0), mientras MIX-VALID con otro lambda da p=0.61; no se cita en el HTML; probablemente fluctuacion, falta una repeticion con otra semilla para decidir",
    "round": 3,
    "source": "verifier"
+  },
+  {
+   "status": "verified",
+   "text": "CHK-1 aplica-ok: doughnut (tools_simulations.py:130-158, beta=2e l.155) tiene pico del anillo 1.000000 en r=206.53 nm y potencia e=2.71828 veces la gaussiana; SimuFLUX 1/e. Pedestal/amplitud 0.1031/0.1291/0.1540/0.1277 -> /e 0.0379/0.0475/0.0567/0.0470 (3.79-5.67 veces 0.01; 0.01*e=0.0272). Menor: el rango de zero_ratio es 8.66-11.02 % (no 9.0-11.0), y zr/e es aproximado porque el max del mapa incluye el pedestal (zr/(1-zr)/e = 0.035-0.046)",
+   "round": 3,
+   "source": "verifier"
+  },
+  {
+   "status": "verified",
+   "text": "CHK-2 aplica-ok: honesta |b| 0.12 nm, RMSE/CRB 0.99, contra ingenua 62.76 nm/23.45 (NOTAS_Simulacion.txt, r0=(5,-5)); comparación justa según F290-D7 (coincide con state.json)",
+   "round": 3,
+   "source": "verifier"
+  },
+  {
+   "status": "refuted",
+   "text": "CHK-3 'CRB_fondo/CRB_fija = 0.984-0.999 en |r|<=L/2 (cambio <=1.6 %)' — sale de muestrear 9 puntos; en el disco denso, con el mismo método (SBR local congelada), da 0.945-1.000, y con el modelo físico de fondo constante (gradiente completo) 0.919-1.003 (peor punto r~47 nm hacia un haz: 2.370 -> 2.178 nm, 8 %). Sí verificados: S(r)/S(0) 1.000-2.106 (4.65-4.69 en |r|=L), S(0;50)/S(0;103.23) = 0.246 (L^2 0.235), CRB propio 0.8684 contra ts 0.8689. En el r0 de los MC el cociente es 0.99-1.00 (no cambia números de los estudios). El estado 'falla' es discutible: con Ns y Nb fijos en una sola posición el fondo de sim_exp ya es constante por exposición; solo afecta a los mapas de CRB",
+   "round": 3,
+   "source": "verifier"
+  },
+  {
+   "status": "verified",
+   "text": "CHK-4 aplica-ok: pos_MINFLUX usa la SBR verdadera y el fondo 1/K (l.1041); F152 y F290-D4 (|z|<=1.3, 628 500 fotones) y F104 latente con b<T/K coinciden con state.json",
+   "round": 3,
+   "source": "verifier"
+  },
+  {
+   "status": "verified",
+   "text": "CHK-5 no aplica: p_i = PSF_i/sum PSF sin modelo de detección (tools_simulations.py:444-449, 1036-1041)",
+   "round": 3,
+   "source": "verifier"
+  },
+  {
+   "status": "verified",
+   "text": "CHK-6 aplica-ok parcial: geom_exp separa la geometría de la forma (geometría sola |b| 0.38 nm, RMSE/CRB 1.06, contra forma 62.76 nm en NOTAS); solo 2D, sin z: el estado debería decir 'parcial' (algo generoso)",
+   "round": 3,
+   "source": "verifier"
+  },
+  {
+   "status": "verified",
+   "text": "CHK-7 aplica-ok: una perla uniforme de 20 nm llena el cero hasta 0.2546 % del pico del anillo (aprox. 0.2549 %) = 2.3-2.9 % del zero_ratio de 8.66-11.02 %; 100 nm: 6.16 % = 55.9-71.1 %; como disco sería 0.318 % (misma conclusión); tamaño de 20 nm según ESTADO:31, sin confirmar",
+   "round": 3,
+   "source": "verifier"
+  },
+  {
+   "status": "refuted",
+   "text": "CHK-8 estado 'falla' — el ítem pregunta por dwells y pesos de dwell (ctrDwellFactor/CFR), que en p-MINFLUX están bien (iguales, b=dt/K); la falla citada es F202 (potencia de los haces, que entra en I_i, no en w_i), ya clasificada DISENO y condicionada a un supuesto sin confirmar. Los números citados coinciden con F202 (10.6 nm; [0.111,0.262,0.314,0.313] -> [0.111,0.207,0.342,0.340]; 1.379). Debería ser aplica-ok con una nota que remita a F202",
+   "round": 3,
+   "source": "verifier"
+  },
+  {
+   "status": "verified",
+   "text": "CHK-9 aplica-ok: Ns y Nb fijos y declarados; F105 (0-0.71 %, 0.993-1.000) coincide con state.json",
+   "round": 3,
+   "source": "verifier"
+  },
+  {
+   "status": "verified",
+   "text": "CHK-10 no aplica: sin filtros; F290-D1 (0/300, márgenes 3/55/76/105) coincide",
+   "round": 3,
+   "source": "verifier"
+  },
+  {
+   "status": "verified",
+   "text": "CHK-11 no aplica: solo hay MLE sobre grilla (tools_simulations.py:1002-1110, tools_analysis.py:434-483 con log+argmax); least_squares solo en realistic_ebp.py:140 (ajuste de PSF)",
+   "round": 3,
+   "source": "verifier"
+  },
+  {
+   "status": "verified",
+   "text": "CHK-12 aplica-ok: reporta std, |b|, RMSE y RMSE/CRB (simulation_misalignment.py:226-241, 263-281); F205 (0.43 contra 0.02 nm) y F204 (SE real 1.63-1.88 veces el impreso) coinciden",
+   "round": 3,
+   "source": "verifier"
+  },
+  {
+   "status": "unclear",
+   "text": "CHK-13 estado 'falla' — los números coinciden con F203 (12.1/13.2/50.0/81.9 nm, 0/1/50/87 % en el borde; honesto con N=100: 12-26 nm) y con eficiencia.log (N=100: 1.89, |b| 4.138), pero lo que el ítem pregunta literalmente se cumple (evaluó N=100 y reporta el disco de 77.4 nm); 'falla parcial' sería más justo. Decide la persona",
+   "round": 3,
+   "source": "verifier"
+  },
+  {
+   "status": "verified",
+   "text": "CHK-14 aplica-ok: MLE asintótico propio en (5,-5),(-5,-8),(20,0),(0,-30): datos 343.9/est 360 máx 0.044 nm, 360/432 máx 0.147, 399.3/343.9 máx 0.1275; en (14,14) 0.048/0.163/0.140 (las cotas valen solo para las 4 posiciones). Ubicación errónea: make_fig_eficiencia.py:69-71 es un flush; el fwhm está en l.48 y 82-86. No verificado el '~5.4 nm de Realista ingenua'",
+   "round": 3,
+   "source": "verifier"
+  },
+  {
+   "status": "verified",
+   "text": "CHK-15 aplica-ok: RMSE = sqrt(0.5*(sx^2+sy^2+bx^2+by^2)) (simulation_misalignment.py:231-232), CRB sqrt(1/(dN))sqrt(E/F) (l.698) = sqrt(tr Sigma/2); build_doc 4.2, traza a 1e-9; F151 4.4e-4 nm; 62.76/sqrt2 = 44.4 < 46.96",
+   "round": 3,
+   "source": "verifier"
+  },
+  {
+   "status": "verified",
+   "text": "CHK-16 aplica-ok: ts.crb_minflux a SBR 21.05 da 0.8863 en r=0 contra 0.8847-0.8849 en los vecinos; Fisher continuo propio 0.8858. SBR 1e12: punto 0.8509 (legado) / 0.8505 (continuo, h=1e-3); límite r->0: 0.7496. Texto: el punto es 13.5 % mayor que el límite (el límite es 11.9 % menor, no 13.5 %)",
+   "round": 3,
+   "source": "verifier"
+  },
+  {
+   "status": "verified",
+   "text": "CHK-17 no aplica: patrón fijo y centrado, sin búsqueda ni iteraciones",
+   "round": 3,
+   "source": "verifier"
+  },
+  {
+   "status": "verified",
+   "text": "CHK-18 no aplica: una sola L (103.23), potencia y SBR por estudio",
+   "round": 3,
+   "source": "verifier"
+  },
+  {
+   "status": "verified",
+   "text": "CHK-19 aplica-ok: simulación propia en (-5,-8): p-MINFLUX sigma_fl = 6.46e-4 nm = 7.5e-4 sigma_CRB (100 us) y 7.4e-3 (1 us), contra 7.6e-4/7.1e-3 del worker; secuencial 4x100 us repetido 25 veces (10 ms) 2.60 nm = 3.0 sigma_CRB (worker 2.67/3.1; el control no lineal coincide). Precisión: con un único barrido de 400 us daría 23 nm = 26 sigma_CRB; el JSON debería decir '25 barridos / 10 ms'. F107 (51.35 %) coincide",
+   "round": 3,
+   "source": "verifier"
+  },
+  {
+   "status": "verified",
+   "text": "CHK-20 no aplica: un solo emisor con Ns fijo (sim_exp); sin blanqueo ni vecinos",
+   "round": 3,
+   "source": "verifier"
+  },
+  {
+   "status": "verified",
+   "text": "CHK-21 no aplica: emisor estático y sin tracking; el F101 citado (<=0.09-0.10 SE a 0.0105/ciclo, <=0.05 SE en tracking) coincide con MIX-STUDY y MIX-TRACKING, verificados en r01",
+   "round": 3,
+   "source": "verifier"
   }
  ],
  "plan": [
   "R1: validación de la matriz de mezcla contra sim_exp + auditorías A (núcleo) y B (estudios)",
-  "R2: registro de hallazgos verificado, simulador en dominio temporal, estimador consciente de la fuga, comparación legado vs v2"
+  "R2: registro de hallazgos verificado, simulador en dominio temporal, estimador consciente de la fuga, comparación legado vs v2",
+  "R3: usabilidad (README, migración, count_windows con offsets, guard, F107), figuras, reporte HTML; checklist SimuFLUX (21 ítems); pasada final de correcciones"
  ],
  "backlog": [
-  "FIX (refuted r2): guard para b > T/K (ventanas solapadas) en simulate/crb/mle_mixing, o error explícito",
-  "FIX (refuted r2): referencia del doble conteo con b=13, tau=4.21: 11.175 % (no 11.15; el 11.11 era una semilla)",
-  "FIX (refuted r2): texto 'sesgo residual del MLE de mezcla ≤0.11 nm no viene del estimador' -> tasa finita 0.02–0.035 nm + sesgo O(1/N) del MLE (~0.036 nm); todo ≤0.03 CRB",
-  "F205 redacción: 0.912 nm es el RMSE correcto (contra el píxel simulado); 0.960 lo produce el script legado (inflado por 0.4455 nm)",
-  "Documentar: d = n·T anula exactamente el sesgo de tiempo muerto (demostrado por el verificador); 'highest' con fondo a tasa alta fija SBR incidente vs sim_exp registrado (limitación); tiempo muerto 22 ns supuesto; IRF 0.3 ns supuesto",
-  "Usabilidad: README, __init__ que exponga simulate/estimate/psf/mixing, ejemplo de punta a punta, tabla de migración legado→v2, función pública para contar microtiempos reales en ventanas (periódicas), endurecer test_compare_json_complete, rendimiento del arranque en grilla (chunking)",
-  "R3: report/index.html autocontenido (hallazgos por clase, crimen inverso, qué estaba bien, qué hacer distinto, tabla legado vs v2, figuras embebidas) + verificación final"
+  "Validar v2 contra microtiempos reales (20260707) y medir el tiempo muerto real del APD (22 ns es supuesto)",
+  "Rehacer los estudios con las PSF 20260820 cuando estén en disco",
+  "Confirmar el supuesto de F202 (máximo del .npy = potencia del haz)",
+  "Incluir la distorsión de TCSPC/tiempo muerto a tasa finita en el modelo directo (hoy ≤0.03 CRB)",
+  "Tests débiles restantes (F204 SE>0, umbral de test_low_rate, fórmula de F102); n_mode poisson / KS d>T / β libre sin ruta independiente",
+  "Autoría: recuperar con el historial de la autora (sin git no es verificable)"
  ],
  "history": [
   {
@@ -776,11 +902,25 @@
     "refuted": 3,
     "unclear": 7
    }
+  },
+  {
+   "round": 3,
+   "summary": "Versión v2 usable (README, migración, datos reales con offsets, aviso de C mal condicionada, emulación exacta de sim_exp), figuras y reporte HTML autocontenido; sesgo Neyman-Scott de potencias libres; checklist SimuFLUX: 12 aplica-ok, 2 fallan (parciales), 7 no aplica. [[DONE]] por el orquestador: aceptación y suite en verde, todo lo del reporte verificado.",
+   "claims": {
+    "verified": 40,
+    "refuted": 10,
+    "unclear": 6
+   },
+   "checks": "passed",
+   "acceptance": "passed"
   }
  ],
  "last_checks": {
   "passed": true,
-  "detail": "test_mixing 18 OK; acceptance mixing tests OK"
+  "detail": "75 unit tests OK"
  },
- "last_acceptance": null
+ "last_acceptance": {
+  "passed": true,
+  "detail": "tests.test_acceptance 6/6 OK; report/index.html con 16 hallazgos, checklist SimuFLUX verificado (18/21 + 3 corregidos)"
+ }
 }

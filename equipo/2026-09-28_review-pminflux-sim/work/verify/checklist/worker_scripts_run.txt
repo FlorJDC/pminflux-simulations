@@ -1,0 +1,60 @@
+##### scripts/findings/C01_donut_normalization_factor_e.py
+(a) pico del anillo: legado 1.000000 (en r = 206.53 nm), SimuFLUX 0.367879 (1/e = 0.367879)
+    potencia/potencia gaussiana: legado 2.7183, SimuFLUX 1.0000  -> factor 2.7183 (e = 2.7183)
+(b) pedestal (unidades del max de la imagen): [0.0703, 0.1028, 0.1266, 0.0897]
+    pedestal/pico del anillo (Balzarotti):   [0.1031, 0.1291, 0.154, 0.1277]
+    equivalente zerooffset SimuFLUX (/e):     [0.0379, 0.0475, 0.0567, 0.047]
+    SimuFLUX SI Fig.5 zerooffset 0.01 = 0.0272 del pico del anillo
+(c) zero_ratio experimental (min/max mapa): [0.09, 0.0866, 0.1035, 0.1102] -> SimuFLUX: [0.0331, 0.0319, 0.0381, 0.0406]
+(d) grilla 400 nm, dona ideal fwhm 343.9: max del mapa = 1.000000, min = 0.00e+00, radio del anillo = 206.5 nm
+##### scripts/findings/C03_fixed_sbr_vs_constant_background.py
+validacion CRB SBR fija en [5.0, -5.0]: legado 0.8689 nm, propio 0.8684 nm
+validacion CRB SBR fija en [-5.0, -8.0]: legado 0.8639 nm, propio 0.8635 nm
+
+S(r)/S(0) y CRB (Ns = 2000): SBR fija 21.05 vs fondo constante (SBR_0 = 21.05 en r = 0)
+  r                          S/S0   SBR(r)   CRB_fija  CRB_fondo cociente
+  (5,-5)                    1.022    21.51      0.868      0.868   0.999
+  (-5,-8)                   1.039    21.87      0.863      0.862   0.998
+  |r|=25.8 @ 90 deg         1.288    27.11      1.171      1.163   0.994
+  |r|=25.8 @ 30 deg         1.289    27.13      1.068      1.057   0.989
+  |r|=25.8 @270 deg         1.289    27.13      1.068      1.057   0.989
+  |r|=51.6 @ 90 deg         2.098    44.18      2.900      2.864   0.988
+  |r|=51.6 @ 30 deg         2.106    44.33      2.330      2.292   0.984
+  |r|=51.6 @270 deg         2.106    44.33      2.330      2.292   0.984
+  |r|=103.2 @ 90 deg        4.647    97.83      7.519      7.397   0.984
+  |r|=103.2 @ 30 deg        4.691    98.76      4.504      4.417   0.981
+  |r|=103.2 @270 deg        4.691    98.76      4.504      4.417   0.981
+  rango de S(r)/S(0) en |r| <= L/2: 1.000 - 2.106
+
+SBR en el centro vs L (fondo constante por exposicion, misma potencia):
+  L =  50.00 nm: S(0;L)/S(0;103.23) = 0.246   (L^2 ley: 0.235)
+  L =  75.00 nm: S(0;L)/S(0;103.23) = 0.544   (L^2 ley: 0.528)
+  L = 103.23 nm: S(0;L)/S(0;103.23) = 1.000   (L^2 ley: 1.000)
+  L = 150.00 nm: S(0;L)/S(0;103.23) = 1.970   (L^2 ley: 2.111)
+  L = 200.00 nm: S(0;L)/S(0;103.23) = 3.161   (L^2 ley: 3.754)
+##### scripts/findings/C07_bead_fills_zero.py
+perla D =    20 nm: cero llenado = 0.2546 % del pico del anillo (analitico 0.2549 %); fraccion del zero_ratio medido 8.7-11.0 %: 2.3-2.9 %
+perla D =    40 nm: cero llenado = 1.0135 % del pico del anillo (analitico 1.0196 %); fraccion del zero_ratio medido 8.7-11.0 %: 9.2-11.6 %
+perla D =   100 nm: cero llenado = 6.1560 % del pico del anillo (analitico 6.3726 %); fraccion del zero_ratio medido 8.7-11.0 %: 56.0-70.8 %
+perla D =   200 nm: cero llenado = 22.3294 % del pico del anillo (analitico 25.4903 %); fraccion del zero_ratio medido 8.7-11.0 %: 203.0-256.7 %
+##### scripts/findings/C14_estimator_fwhm_mismatch.py
+CRB (fwhm 343.9, SBR 21.05, N 2095): (5.0, -5.0) 0.868 nm, (-5.0, -8.0) 0.863 nm, (20.0, 0.0) 0.975 nm, (0.0, -30.0) 1.207 nm
+datos/estimador        (5.0, -5.0)      (-5.0, -8.0)       (20.0, 0.0)      (0.0, -30.0)   max|b|/CRB
+343.9/343.9           |b|=0.000 nm      |b|=0.000 nm      |b|=0.000 nm      |b|=0.000 nm   0.00
+343.9/360.0           |b|=0.025 nm      |b|=0.032 nm      |b|=0.044 nm      |b|=0.025 nm   0.04
+360.0/432.0           |b|=0.082 nm      |b|=0.102 nm      |b|=0.147 nm      |b|=0.114 nm   0.15
+360.0/300.0           |b|=0.116 nm      |b|=0.142 nm      |b|=0.185 nm      |b|=0.049 nm   0.19
+399.3/343.9           |b|=0.075 nm      |b|=0.093 nm      |b|=0.127 nm      |b|=0.066 nm   0.13
+##### scripts/findings/C16_crb_at_exact_zero.py
+pixel central -> [0. 0.] nm
+SBR        legado r=0 legado vec.1nm     cont r=0  cont 1e-3nm    cont 1 nm
+21.1           0.8863         0.8848       0.8858       0.8858       0.8844
+1e+03          0.8517         0.8041       0.8512       0.8512       0.8037
+1e+06          0.8509         0.7505       0.8505       0.8504       0.7500
+1e+12          0.8509         0.7503       0.8505       0.7496       0.7499
+##### scripts/findings/C19_blinking_vs_pattern_period.py
+sigma_CRB en (-5,-8) = 0.863 nm (por eje, promediado)
+t_on = t_off =      1 us, p-MINFLUX 50 ns     : sigma_fl = 6.14e-03 nm = 7.10e-03 sigma_CRB
+t_on = t_off =      1 us, secuencial 4x100 us : sigma_fl = 4.00e-01 nm = 4.64e-01 sigma_CRB
+t_on = t_off =    100 us, p-MINFLUX 50 ns     : sigma_fl = 6.57e-04 nm = 7.61e-04 sigma_CRB
+t_on = t_off =    100 us, secuencial 4x100 us : sigma_fl = 2.67e+00 nm = 3.10e+00 sigma_CRB

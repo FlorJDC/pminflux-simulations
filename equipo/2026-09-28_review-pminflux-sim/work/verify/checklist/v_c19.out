@@ -1,0 +1,6 @@
+p-MINFLUX interleaved t_on=t_off=100000 ns: sigma_fl 7.178e-04 nm, CRB 0.8684, ratio 8.27e-04 (n=2000)
+p-MINFLUX interleaved t_on=t_off=1000 ns: sigma_fl 7.120e-03 nm, CRB 0.8684, ratio 8.20e-03 (n=2000)
+sequential 4x100us x1 reps: linear sigma_fl 22.998 nm ratio 26.48 (n=3961)
+   nonlinear (asymptotic MLE) sigma_fl 23.750 nm ratio 27.35 (n=590)
+sequential 4x100us x25 reps: linear sigma_fl 2.955 nm ratio 3.40 (n=4000)
+   nonlinear (asymptotic MLE) sigma_fl 2.892 nm ratio 3.33 (n=600)

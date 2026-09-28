@@ -1,0 +1,12 @@
+fisico (gradiente completo, N=Ns+Nb(r)) : min 0.9192 at r=47.3 th=210 S/S0=1.931 ; max 1.0032 at r=9.2 th=30
+SBR local congelada (worker) : min 0.9454 at r=46.4 th=210 S/S0=1.899 ; max 1.0000 at r=0.5 th=210
+|r|=25.8 @ 90  S/S0=1.288  frozen 0.994  full 0.992
+|r|=25.8 @ 30  S/S0=1.289  frozen 0.989  full 0.997
+|r|=25.8 @270  S/S0=1.289  frozen 0.989  full 0.997
+|r|=51.6 @ 90  S/S0=2.098  frozen 0.988  full 0.989
+|r|=51.6 @ 30  S/S0=2.106  frozen 0.984  full 1.000
+|r|=51.6 @270  S/S0=2.106  frozen 0.984  full 1.000
+|r|=103.2 @ 90  S/S0=4.647  frozen 0.984  full 0.985
+|r|=103.2 @ 30  S/S0=4.691  frozen 0.981  full 0.985
+|r|=103.2 @270  S/S0=4.691  frozen 0.981  full 0.985
+worst point CRB fixed 2.3695 vs full 2.1781 nm

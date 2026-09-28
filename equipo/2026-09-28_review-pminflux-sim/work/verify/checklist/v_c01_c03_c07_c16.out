@@ -1,0 +1,30 @@
+=== C01
+ring peak legacy 1.000000 at r=206.53 ; simuflux 0.367879 (1/e 0.367879)
+power leg/gau 2.71828 simu/gau 1.00000 ratio 2.71828 e=2.71828
+ts.doughnut peak check: [1.]
+ped/amp [0.1031 0.1291 0.154  0.1277]  /e [0.0379 0.0475 0.0567 0.047 ]
+zero_ratio [0.09   0.0866 0.1035 0.1102]  /e [0.0331 0.0319 0.0381 0.0406]  zr/(1-zr)/e [0.0364 0.0349 0.0425 0.0456]
+0.01*e = 0.027182818284590453 ; ratio of converted pedestals to 0.01: [3.79 4.75 5.67 4.7 ]
+max of donut on 400 nm grid: 0.999999997721662  ring radius 206.53299819083006
+=== C03
+S(r)/S(0) in |r|<=L/2: 1.0000 - 2.1055
+CRB const/fixed in 0<|r|<=L/2: 0.9091 - 1.0026
+S at |r|=L: 4.647 - 4.691
+CRB ratio at |r|=L: 0.9659 - 0.9672
+S(0;50)/S(0;103.23) = 0.2461 ; L^2 law 0.2346
+own fixed CRB at (5,-5): 0.8684
+legacy crb_minflux at (5,-5): 0.8689
+=== C16
+legacy center [200,200]: 0.8863 ; neighbours: [0.8849 0.8847 0.8848 0.8848]
+own continuous at r=0 (h=1e-3): 0.8858 ; at 1 nm 0.8844 ; at 1e-3 nm 0.8858
+legacy SBR 1e12 center 0.8509 neighbours [0.7542 0.7465 0.7503 0.7503]
+ own SBR1e12 at r=1: 0.7469
+ own SBR1e12 at r=0.1: 0.7492
+ own SBR1e12 at r=0.01: 0.7495
+ own SBR1e12 at r=0.001: 0.7496
+ own SBR1e12 point at 0 with h=1 nm: 0.8509
+ own SBR1e12 point at 0 with h=1e-3: 0.8505
+=== C07
+bead 20 nm: fill 0.2546 % of ring peak; analytic small 0.2549 %; / zero_ratio: 2.3 - 2.9 %
+bead 100 nm: fill 6.1633 % of ring peak; analytic small 6.3726 %; / zero_ratio: 55.9 - 71.1 %
+20 nm as uniform disk: 0.3181 %

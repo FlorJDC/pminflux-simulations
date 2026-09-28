@@ -15,13 +15,16 @@ from __future__ import print_function
 import ast
 import base64
 import datetime
-import hashlib
 import html
 import io
 import json
 import math
 import os
 import re
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from provenance_sha import sha256_file  # noqa: E402  (sha256 robusto a finales de línea)
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 JOB = "equipo/2026-09-28_review-pminflux-sim"
@@ -49,13 +52,21 @@ def load(rel, default=None):
 
 
 def sha256(rel):
-    path = _p(rel)
-    if not os.path.exists(path):
-        return None
-    h = hashlib.sha256()
-    with open(path, "rb") as fh:
-        h.update(fh.read())
-    return h.hexdigest()
+    """sha256 con fin de línea normalizado (scripts/provenance_sha.py); None si no existe."""
+    return sha256_file(_p(rel))
+
+
+# privacidad: el HTML es solo para la autora; no se muestran rutas locales de sus datos
+_PRIV_SUBS = [
+    (re.compile(r"C:\\Data\\psf\\20260820 no existe"), "las PSF de la calibración 20260820 no estaban disponibles"),
+    (re.compile(r"(?<![A-Za-z])[A-Z]:\\(?:Data|Users)(?:\\[^\s<>\"',;)]*)?"), "(ruta local omitida)"),
+]
+
+
+def scrub(s):
+    for rx, rep in _PRIV_SUBS:
+        s = rx.sub(rep, s)
+    return s
 
 
 def exists(rel):
@@ -74,7 +85,31 @@ STATE = load(JOB + "/state.json", {})
 CAPS = load("report/figs/captions.json", {}) or {}
 FIND_A = load("results/findings_A.json", {})
 
+CHECKLIST = load("results/simuflux_checklist.json", []) or []
+
 CLAIMS = STATE.get("claims", [])
+
+
+def report_claims(rel):
+    """Bloque ```claims``` de un reporte de rol (lista, o None si el reporte no existe)."""
+    path = _p(rel)
+    if not os.path.exists(path):
+        return None
+    with io.open(path, encoding="utf-8") as fh:
+        txt = fh.read()
+    m = re.search(r"```claims\s*(\[.*?\])\s*```", txt, re.S)
+    if not m:
+        return []
+    try:
+        return json.loads(m.group(1))
+    except ValueError:
+        return []
+
+
+FIXW_REL = JOB + "/reports/r03-fix-worker.md"
+FIXW = report_claims(FIXW_REL) or []
+CHKV_REL = JOB + "/reports/r03-verifier-checklist.md"
+CHKV = report_claims(CHKV_REL)          # None = el verificador del checklist todavía no corrió
 
 # ----------------------------------------------------------------------------- procedencia
 
@@ -126,6 +161,25 @@ def claim_text(prefix):
     return claim(prefix)[1]["text"] if claim(prefix)[1] else ""
 
 
+def fixw(prefix):
+    """(índice, afirmación) del bloque claims de r03-fix-worker.md cuyo texto empieza con prefix."""
+    for i, c in enumerate(FIXW):
+        if c.get("text", "").startswith(prefix):
+            return i, c
+    return None, None
+
+
+def fixw_src(key, prefix, reproduce):
+    """Etiqueta para un arreglo de la pasada final (auto-verificado por el fix-worker con tests)."""
+    i, c = fixw(prefix)
+    if c is None:
+        return ""
+    rep = reproduce if exists(reproduce) else FIXW_REL
+    return src(key, c["text"], "check" if exists(reproduce) else "source", rep,
+               detail="bloque claims de %s, entrada %d (fix-worker R3: cubierto por tests; revisión "
+                      "independiente parcial)" % (FIXW_REL, i))
+
+
 # ----------------------------------------------------------------------------- formato
 
 E = html.escape
@@ -168,6 +222,7 @@ def pos(p):
 # ----------------------------------------------------------------------------- figuras
 
 FIG_SCRIPT = "scripts/make_report_figures.py"
+FIG_ADJUSTED = ("timeline_20MHz.png", "rate_sweep.png", "dead_time_sweep.png")   # r03-fix-worker.md §5
 
 
 def figure(name, fallback_title):
@@ -188,8 +243,16 @@ def figure(name, fallback_title):
             "script" if exists(FIG_SCRIPT) else "data", rep,
             detail="datos: %s; png sha256 %s" % (cap.get("source", "?"), sha256("report/figs/" + name)))
     fver = any(name in c.get("text", "") and c.get("status") == "verified" for c in CLAIMS)
-    st = "" if fver else (" <span class='muted'>(Figura y leyenda de R3, Worker 2: se dibujan desde los JSON "
-                          "verificados; la verificación de la figura en sí está pendiente.)</span>")
+    fi, fc = claim("Figuras report/figs")
+    if fver:
+        st = ""
+    elif fc is not None and fc.get("status") == "verified":
+        st = " <span class='muted'>(Números de la leyenda verificados contra los JSON en R3 %s%s.)</span>" % (
+            claim_src("claim-figs", "Figuras report/figs"),
+            "; leyenda ajustada en la pasada final según el verificador" if name in FIG_ADJUSTED else "")
+    else:
+        st = (" <span class='muted'>(Figura y leyenda de R3, Worker 2: se dibujan desde los JSON "
+              "verificados; la verificación de la figura en sí está pendiente.)</span>")
     return ('<figure class="fig"><img alt="%s" src="data:image/png;base64,%s">'
             '<figcaption><b>%s.</b> %s <span class="muted">Fuente: <code>%s</code>.</span> %s%s'
             '</figcaption></figure>' % (E(title), b64, E(title), E(cap.get("caption", "")),
@@ -310,7 +373,8 @@ def s_resumen():
     f104b = [c["legacy_asymptotic_bias_nm"] for c in fr]
     dt = {(r["tcspc"], r["dead_time_ns"], r["rate_per_cycle"]): r for r in DEAD.get("rows", [])}
     rmax = max(DEAD["params"]["rates_per_cycle"]) if DEAD else None
-    d_nT = [dt[("earliest", d, rmax)]["max_abs_bias_SE_per_loc"] for d in (50.0, 100.0) if ("earliest", d, rmax) in dt]
+    d_nT = [r["max_abs_bias_SE_per_loc"] for r in DEAD.get("rows", [])
+            if r["tcspc"] == "earliest" and r["dead_time_ns"] in (50.0, 100.0)]
     d22 = dt.get(("earliest", 22.0, rmax), {}).get("max_abs_bias_SE_per_loc")
     b = []
     b.append('<p class="lead">Revisamos el simulador p-MINFLUX de <code>legacy/p-minflux-main</code> con la '
@@ -325,7 +389,7 @@ def s_resumen():
     b.append("<ol class='keys'>")
     b.append("<li><b>La matriz de mezcla es correcta y necesaria.</b> Con τ = %g ns y pulsos cada %g ns, "
              "un %s de los fotones de cada haz cae en la ventana del haz siguiente (C<sub>i,i−1</sub> = %s) %s. "
-             "El modelo de mezcla describe <code>sim_exp</code> (χ² p = %s con %s fotones detectados); el modelo "
+             "El modelo de mezcla describe <code>sim_exp</code> (χ² p = %s con %s fotones en ventanas); el modelo "
              "ingenuo de la Ec. 3.5 queda rechazado (χ² = %s, p %s) %s.</li>"
              % (TAU, DT, pct(CPREV), f(CPREV, 4), mv_src(), pval(MIXV["chi2_pvalue_mixing_vs_sim_exp"]),
                 sci(MIXV["n_detected_total"], 2), f(MIXV["chi2_naive"], 0),
@@ -340,7 +404,7 @@ def s_resumen():
     b.append("<li><b>La versión v2</b> (<code>src/pminflux_sim</code>) simula en dominio temporal (τ, IRF, "
              "ventanas periódicas, TCSPC de primer fotón, tiempo muerto) y estima con la matriz de mezcla. "
              "Sobre los mismos datos, en 20 casos: legado |b| %s nm y RMSE/CRB %s; mezcla |b| ≤ %s nm y "
-             "RMSE/CRB %s %s.</li>" % (rng(leg_b), rng(leg_r), f(max(mix_b), 2), rng(mix_r), cmp_src()))
+             "RMSE/CRB %s %s.</li>" % (rng(leg_b), rng(leg_r), f(max(mix_b), 3), rng(mix_r), cmp_src()))
     if d_nT and d22 is not None:
         b.append("<li><b>Tiempo muerto.</b> Con un tiempo muerto de %g ns (supuesto) y %g fotones/ciclo, el sesgo "
                  "por ventana es ≤ %s SE por localización; con d = n·T (50 o 100 ns) se anula exactamente "
@@ -351,6 +415,19 @@ def s_resumen():
              "fuga; la validación del término de fondo; la corrección de <code>spaceToIndex</code>; el diseño "
              "honesto/ingenuo con comparación justa; y la autora ya había anotado como pendientes el τ y la IRF "
              "medidos, las potencias distintas por haz y la trazabilidad de los logs.</li>")
+    if CHECKLIST:
+        cnt = {}
+        for x in CHECKLIST:
+            cnt[x["estado"]] = cnt.get(x["estado"], 0) + 1
+        b.append("<li><b>Checklist SimuFLUX</b> (<a href='#simuflux'>§10</a>): de %d ítems, %d aplican y están bien, "
+                 "%d fallan y %d no aplican %s%s.</li>" % (
+                     len(CHECKLIST), cnt.get("aplica-ok", 0), cnt.get("falla", 0), cnt.get("no aplica", 0),
+                     src("simuflux-checklist", "Auditoría del legado contra los 21 ítems de errores frecuentes de "
+                         "simulaciones MINFLUX de SimuFLUX (results/simuflux_checklist.json)", "data",
+                         "results/simuflux_checklist.json",
+                         detail="sha256 %s; worker R3 (reports/r03-simuflux-checklist.md)" % sha256(
+                             "results/simuflux_checklist.json"), json_file="results/simuflux_checklist.json"),
+                     " (verificación independiente pendiente)" if CHKV is None else ""))
     b.append("</ol>")
     return section("resumen", "1. Resumen ejecutivo", "\n".join(b))
 
@@ -365,7 +442,7 @@ def s_metodo():
          "reprodujo un <b>verificador independiente</b> por otro camino (simulador fotón por fotón propio, "
          "cuadraturas propias, otras semillas), sin ver el razonamiento del worker. Solo lo que el verificador "
          "reprodujo entra como <b>verificado</b>; lo refutado se corrigió y lo no reproducido figura como "
-         "<i>unclear</i> en §10.</p>" % STATE.get("rounds_budget", "?"),
+         "<i>unclear</i> en §11.</p>" % STATE.get("rounds_budget", "?"),
          "<p>Estado del ledger al generar este reporte: %s %s.</p>" % (
              ", ".join("%d %s" % (v, k) for k, v in sorted(st.items())),
              src("ledger", "Conteo de afirmaciones del ledger por estado", "data", JOB + "/state.json",
@@ -412,7 +489,7 @@ def s_crimen():
     b = []
     b.append("<div class='callout'><b>En una frase.</b> Si simulás los datos con el mismo modelo directo que usa "
              "el estimador, el estudio solo mide la varianza del estimador <i>bajo su propio modelo</i>: por "
-             "construcción alcanza el CRB, y queda ciego a cualquier diferencia entre ese modelo y el instrumento. "
+             "construcción es insesgado y alcanza el CRB asintóticamente, y queda ciego a cualquier diferencia entre ese modelo y el instrumento. "
              "En problemas inversos a esto se lo llama “crimen inverso”.</div>")
     b.append("<h3>Qué pasa físicamente a 20 MHz</h3>")
     b.append("<p>En p-MINFLUX pulsado el ciclo TCSPC dura T = %g ns y los K = %d haces se disparan intercalados, "
@@ -440,7 +517,7 @@ def s_crimen():
              "e<sup>−%g</sup>: fuga nula. Con b = T/K las ventanas cubren el ciclo y el fondo cae 1/K en cada una. "
              "En ese régimen los datos simulados siguen <i>exactamente</i> la Ec. 3.5 (la autora lo verificó "
              "empíricamente y es exacto: F290-D4) %s. Es decir, se generan los datos con el mismo modelo que después "
-             "se invierte: el MLE alcanza el CRB por construcción y “honesto ≈ CRB” no dice nada sobre el experimento "
+             "se invierte: el MLE es insesgado y alcanza el CRB asintóticamente por construcción, y “honesto ≈ CRB” no dice nada sobre el experimento "
              "real.</p>" % (fsrc(f201), DT, DT / 0.001, claim_src("claim-D4", "F290-D4")))
     b.append("<p class='note'>%s</p>" % E(f104.get("crimen_inverso_note", "")))
     b.append("<h3>Las dos mitades del mismo error</h3>")
@@ -510,16 +587,35 @@ def card(x):
     cls = x["class"]
     tests = _tests_list(x)
     if x["id"] == "F107":
-        if x.get("v2_test"):
+        ci7, c7 = claim("F107 portado")
+        if x.get("v2_test") and c7 is not None and c7.get("status") == "verified":
+            v2 = ("%s — <b>portado en R3 y verificado en R3</b>: <code>simulate_counts(..., t_mask=...)</code>; "
+                  "sin señal en ciclos de excitación apagados; con SBR 5 la fracción de fotones en la mitad "
+                  "apagada es 1/7 (|z| ≤ 1.5) %s. En la pasada final se agregó "
+                  "<code>sbr_reference=\"on\"|\"total\"</code> para elegir si el SBR se refiere a los ciclos "
+                  "encendidos (default) o al conjunto, como en el legado %s <span class='muted'>(cubierto por "
+                  "tests; revisión independiente parcial)</span>." % (
+                      "; ".join(tests), claim_src("claim-F107-port", "F107 portado"),
+                      fixw_src("fix-sbrref", "simulate_counts(sbr_reference='total')",
+                               "tests/test_simulate.py::TestSimulateBlinking::test_t_mask_sbr_reference")))
+        elif x.get("v2_test"):
             v2 = ("%s — <b>portado en R3</b> (Worker 1): <code>simulate_counts(..., t_mask=...)</code>. "
                   "<span class='badge st-unclear'>pendiente de verificación</span>" % "; ".join(tests))
         else:
             v2 = "<b>No portado a v2</b> (la máscara de parpadeo queda en el backlog). %s" % fsrc(x)
     else:
-        v2 = "%s — los tests v2 de los hallazgos existen y pasan (verificado en R2) %s" % ("; ".join(tests), V2_OK())
+        r3 = [t for t in tests if "TestStudyV2" in t]
+        v2 = "%s — los tests v2 de los hallazgos existen y pasan (verificado en R2%s) %s" % (
+            "; ".join(tests), "; TestStudyV2 es de R3, verificado en R3" if r3 else "", V2_OK())
         if "study_v2" in x.get("v2_fix_status", ""):
-            v2 += (" En R3 el estudio de desalineación se rehízo con v2 (<code>results/study_v2.json</code>, §8), "
-                   "<span class='badge st-unclear'>pendiente de verificación</span>.")
+            sv = [c for c in CLAIMS if c.get("text", "").startswith("study_v2") and c.get("status") == "verified"]
+            if sv:
+                v2 += (" En R3 el estudio de desalineación se rehízo con v2 (<code>results/study_v2.json</code>, "
+                       "<a href='#study-v2'>§8</a>) y lo reprodujo el verificador de forma independiente %s."
+                       % claim_src("claim-study-v2", "study_v2 (N=2095"))
+            else:
+                v2 += (" En R3 el estudio de desalineación se rehízo con v2 (<code>results/study_v2.json</code>, §8), "
+                       "<span class='badge st-unclear'>pendiente de verificación</span>.")
     latent = bool(re.search(r"[Ll]atente[:.]", x.get("impact", "")))
     note = ""
     if x["id"] in VERIFIER_NOTES:
@@ -640,7 +736,7 @@ def s_distinto():
          "coincide. Nada de parámetros escritos a mano.", "F206"),
         ("Fijar las versiones de los datos",
          "Registrar el sha256 de las PSF y calibraciones usadas (las 20260820 no están en disco y los números "
-         "“Experimental” no se pudieron reproducir).", "F202, F204, §10"),
+         "“Experimental” no se pudieron reproducir).", "F202, F204, §11"),
         ("Tests con el código y validaciones de entrada",
          "Los bugs latentes (K ≠ 4, SBR = ∞, a &lt; 0, b &gt; T/K, FWHM gaussiana) los atrapa un test de una línea "
          "o un <code>ValueError</code>.", "F102, F103, F108–F111"),
@@ -759,8 +855,11 @@ def s_v2():
             b.append("<div class='scroll'><table><tr>%s</tr>%s</table></div>" % (
                 "".join("<th>%s</th>" % _md_inline(c) for c in head),
                 "".join("<tr>%s</tr>" % "".join("<td>%s</td>" % _md_inline(c) for c in r) for r in body_)))
-        b.append("<p class='muted'>Tomadas de la sección de migración de <code>README.md</code> %s. El README "
-                 "(R3, Worker 1) está pendiente de revisión independiente.</p>" % rtag)
+        b.append("<p class='muted'>Tomadas de la sección de migración de <code>README.md</code> %s. El revisor "
+                 "de código siguió el README al pie de la letra en un clon (instalación, inicio rápido) y contrastó "
+                 "sus afirmaciones con el código %s %s; lo que faltaba para la migración se agregó en la pasada "
+                 "final (abajo).</p>" % (rtag, claim_src("claim-readme-clone", "README al pie de la letra"),
+                                          claim_src("claim-readme-code", "Afirmaciones del README contra el código")))
     else:
         PLACEHOLDERS.append("tabla de migración (README.md)")
         b.append("<div class='ph'>Tabla de migración pendiente: se toma de la sección de migración de "
@@ -770,6 +869,45 @@ def s_v2():
         b.append("<h3>Ejemplo mínimo</h3><pre><code>%s</code></pre><p class='muted'>Inicio rápido de "
                  "<code>README.md</code> %s; el mismo flujo con tabla de resultados está en "
                  "<code>scripts/example_end_to_end.py</code>.</p>" % (E(code), rtag))
+    feats = [
+        ("fix-starts", "count_windows(starts=)", "tests/test_windows.py::TestStarts",
+         "<b>Datos reales: comienzos de ventana y offset del sync.</b> <code>count_windows(..., starts=)</code>, "
+         "<code>window_starts(T, K, a, t0)</code> y <code>mixing_matrix_starts(tau, T, starts, b, pulse_times, "
+         "irf_fwhm)</code> llevan microtiempos reales (offset del sync, pulsos no equiespaciados) a la matriz de "
+         "mezcla."),
+        ("fix-cond", "estimate.mixing_conditioning", "tests/test_estimate.py::TestMixingConditioning",
+         "<b>Aviso de C mal condicionada.</b> <code>mixing_conditioning(C)</code> emite un "
+         "<code>UserWarning</code> desde <code>mle_mixing</code> y <code>crb</code> cuando las ventanas no "
+         "separan los haces."),
+        ("fix-emul", "emulación de sim_exp", "README.md",
+         "<b>Receta exacta para emular <code>sim_exp</code> + <code>nMINFLUX</code></b> (README §9): "
+         "<code>tcspc='highest'</code>, <code>counting='legacy'</code>, <code>irf_fwhm=0</code>, "
+         "<code>dead_time=0</code>, <code>tau=0.001</code>, <code>b=T/K</code>, "
+         "<code>rate_per_cycle = factor·(Ns+Nb)/M_p</code>."),
+        ("fix-sbrref", "simulate_counts(sbr_reference='total')",
+         "tests/test_simulate.py::TestSimulateBlinking::test_t_mask_sbr_reference",
+         "<b><code>sbr_reference</code> para <code>t_mask</code>.</b> <code>\"on\"</code> (default): el SBR se "
+         "refiere a los ciclos encendidos; <code>\"total\"</code>: Ns/Nb fijos del conjunto, como el legado."),
+        ("fix-fold", "count_windows: una fase plegada", "tests/test_windows.py::TestFoldEdge",
+         "<b>Borde de punto flotante en <code>count_windows</code>.</b>"),
+        ("fix-sha", "sha256 de procedencia", "tests/test_usability.py::TestPublicAPI::test_sha_robust_to_line_endings",
+         "<b>sha256 de procedencia robusto a finales de línea</b> (<code>scripts/provenance_sha.py</code>)."),
+    ]
+    fl = []
+    for key, prefix, rep, desc in feats:
+        i, c = fixw(prefix)
+        if c is None:
+            continue
+        fl.append("<li>%s <span class='muted'>%s</span> %s</li>" % (desc, E(c["text"]), fixw_src(key, prefix, rep)))
+    if fl:
+        suite = fixw("suite completa")[1]
+        b.append("<h3>Agregado en la pasada final de la ronda 3</h3><p>Resuelve lo que el revisor de código y el "
+                 "verificador marcaron como faltante para usar v2 con datos reales y como reemplazo del legado. "
+                 "<span class='badge st-unclear'>cubierto por tests; revisión independiente parcial</span> "
+                 "(los tests los escribió el mismo fix-worker; el verificador no los re-derivó por otra ruta).</p>"
+                 "<ul>%s</ul>%s" % ("".join(fl), (
+                     "<p class='muted'>%s %s</p>" % (E(suite["text"]), fixw_src("fix-suite", "suite completa", "tests")))
+                     if suite else ""))
     b.append("<h3>Cómo se usa</h3><pre><code>")
     cmds = [("python -m unittest discover -s tests", "tests", "tests"),
             ("python scripts/example_end_to_end.py", "ejemplo de punta a punta (setup medido)",
@@ -815,13 +953,10 @@ def s_resultados():
              E(claim_text("W3-R2 tabla compare_legacy_vs_v2")),
              claim_src("claim-cmp-verif", "W3-R2 tabla compare_legacy_vs_v2", "work/verify/r02/v5_compare.py")),
          figure("legacy_vs_v2.png", "Legado contra v2")]
-    b.append("<h3>Estudio de desalineación con v2</h3>")
-    ver = [c for c in CLAIMS if "study_v2" in c.get("text", "") and c.get("status") == "verified"]
+    b.append("<h3 id='study-v2'>Estudio de desalineación con v2</h3>")
+    ver = [c for c in CLAIMS if c.get("text", "").startswith("study_v2") and c.get("status") == "verified"]
     if STUDY is not None and ver:
-        b.append("<p>%s %s</p>" % (E(ver[0]["text"]), src("study-v2", ver[0]["text"], "script",
-                                                          "scripts/study_misalignment_v2.py",
-                                                          detail="results/study_v2.json")))
-        b.append(_study_table())
+        b.append(_study_v2())
     elif STUDY is not None:
         PLACEHOLDERS.append("resultados de study_v2.json (pendientes de verificación)")
         b.append("<div class='ph'><code>results/study_v2.json</code> ya existe (Worker 1, R3), pero todavía no "
@@ -835,17 +970,74 @@ def s_resultados():
     return section("resultados", "8. Resultados: legado contra v2", "\n".join(b))
 
 
-def _study_table():
-    """Tabla genérica de study_v2.json (solo se usa si está verificado)."""
-    rows = STUDY.get("cases") or STUDY.get("rows") or []
-    if not rows:
-        return "<pre>%s</pre>" % E(json.dumps(STUDY, ensure_ascii=False, indent=1)[:3000])
-    keys = [k for k in rows[0] if not isinstance(rows[0][k], (dict, list))][:10]
-    out = ["<div class='scroll'><table class='num'><tr>%s</tr>" % "".join("<th>%s</th>" % E(k) for k in keys)]
-    for r in rows:
-        out.append("<tr>%s</tr>" % "".join(
-            "<td>%s</td>" % (f(r[k], 3) if isinstance(r[k], float) else E(str(r[k]))) for k in keys))
-    out.append("</table></div>")
+STUDY_ROWS = [("ideal/honesto_P_conocidas", "ideal", "mezcla, potencias conocidas"),
+              ("desalineada/honesto_P_conocidas", "desalineada", "mezcla, potencias conocidas"),
+              ("ideal/legado", "ideal", "legado (Ec. 3.5)"),
+              ("desalineada/legado", "desalineada", "legado (Ec. 3.5)"),
+              ("desalineada/ingenuo", "desalineada", "mezcla con geometría ingenua")]
+
+
+def _study_v2():
+    """§8: study_v2.json, solo las filas que reprodujo el verificador de R3."""
+    sm = STUDY.get("summary", {})
+    st = STUDY.get("setup", {})
+    tg = src("study-v2", "Estudio de desalineación y eficiencia con v2 (results/study_v2.json: summary, cases, "
+             "efficiency_sweep)", "script", "scripts/study_misalignment_v2.py",
+             detail="results/study_v2.json sha256 %s; reproducido por el verificador R3 con simulador, MLE y CRB "
+                    "propios (work/verify/r03/v1_study.py)" % sha256("results/study_v2.json"),
+             json_file="results/study_v2.json")
+    vtag = claim_src("claim-study-v2", "study_v2 (N=2095", "work/verify/r03/v1_study.py")
+    vtag_eff = claim_src("claim-study-eff", "study_v2 barrido de eficiencia", "work/verify/r03/v1_study.py")
+    vtag_crb = claim_src("claim-study-crb", "study_v2: CRB por eje", "work/verify/r03/v1_study.py")
+    Ns = sorted(int(k) for k in (sm.get("ideal/legado", {}).get("efficiency_mean_rmse_over_crb_by_N") or {}))
+    out = ["<p>Reemplazo de <code>simulation_misalignment.py</code> y del estudio de eficiencia con "
+           "<code>simulate</code> + <code>estimate</code> v2 en el setup medido: N = %s, %d posiciones continuas "
+           "(fuera de grilla), TCSPC %s con tiempo muerto %g ns (supuesto), IRF %g ns (supuesta), %g fotones/ciclo, "
+           "%d localizaciones por posición; sesgo y RMSE contra la posición simulada y SE por bootstrap %s. "
+           "Supuestos: %s.</p>" % (
+               st.get("N_main"), len(STUDY.get("positions_nm", [])), E(str(st.get("tcspc"))),
+               st.get("dead_time", 0), st.get("irf_fwhm", 0), st.get("rate_per_cycle", 0),
+               STUDY.get("n_loc_per_position", 0), tg, E("; ".join(STUDY.get("assumptions", []))))]
+    head = ("<tr><th>geometría</th><th>estimador</th><th>máx |b| (nm)</th><th>RMSE 2D medio (nm)</th>"
+            "<th>RMSE/CRB medio</th><th>fracción en el borde</th>%s</tr>" % "".join(
+                "<th>RMSE/CRB, N = %d</th>" % n for n in Ns))
+    trs = []
+    for key, geo, lab in STUDY_ROWS:
+        r = sm.get(key)
+        if not r:
+            continue
+        eff = r.get("efficiency_mean_rmse_over_crb_by_N", {})
+        trs.append("<tr><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td>%s</tr>" % (
+            geo, lab, f(r["max_bias_abs_nm"], 3), f(r["mean_rmse_2d_nm"], 2), f(r["mean_rmse_over_crb"], 3),
+            f(r["boundary_fraction"], 3), "".join("<td>%s</td>" % f(eff.get(str(n)), 3) for n in Ns)))
+    out.append("<div class='scroll'><table class='num'>%s%s</table></div>" % (head, "".join(trs)))
+    pk = [sm[k]["max_bias_abs_nm"] for k in ("ideal/honesto_P_conocidas", "desalineada/honesto_P_conocidas") if k in sm]
+    pr = [sm[k]["mean_rmse_over_crb"] for k in ("ideal/honesto_P_conocidas", "desalineada/honesto_P_conocidas") if k in sm]
+    lg = [sm[k]["max_bias_abs_nm"] for k in ("ideal/legado", "desalineada/legado") if k in sm]
+    nv = sm.get("desalineada/ingenuo", {}).get("max_bias_abs_nm")
+    out.append("<p><b>Lectura.</b> Con las potencias de los haces conocidas, el MLE de mezcla queda en |b| ≤ %s nm "
+               "y RMSE/CRB ≈ %s en las dos geometrías; el legado (Ec. 3.5) tiene un sesgo de ≈ %s nm por la fuga; "
+               "y usar la geometría ideal sobre el EBP desalineado da ≈ %s nm. En el barrido de N el legado y el "
+               "ingenuo empeoran en unidades de CRB al crecer N (sesgo fijo), mientras la mezcla con potencias "
+               "conocidas queda ≈ 1 %s %s. El CRB por eje con fuga coincide con el del verificador a 3 decimales "
+               "%s.</p>" % (f(max(pk), 2) if pk else "—", f(sum(pr) / len(pr), 2) if pr else "—",
+                            f(min(lg), 1) if lg else "—", f(nv, 1), tg, vtag_eff, vtag_crb))
+    out.append("<p class='muted'>Reproducción independiente (simulador, MLE y CRB propios, otra semilla): %s %s</p>"
+               % (E(claim_text("study_v2 (N=2095")), vtag))
+    out.append("<p class='muted'>La fila “ideal / ingenuo” de <code>study_v2.json</code> no se muestra: en la "
+               "geometría ideal el modelo ingenuo es el mismo que el de potencias conocidas y los números son "
+               "idénticos.</p>")
+    ns_tag = claim_src("claim-neyman-scott", "Potencias libres compartidas", "work/verify/r03/v2_freepowers.py")
+    ref_tag = claim_src("claim-fp-N100", "W1-R3 'con N=100 las potencias libres", "work/verify/r03/v2b_fp_eval.py")
+    out.append("<p><b>Potencias libres: sesgo de Neyman-Scott.</b> Si además se ajustan las potencias relativas "
+               "de los haces, compartidas entre localizaciones, con una posición libre por localización, el MLE "
+               "conjunto tiene sesgo de parámetros incidentales (Neyman-Scott): las potencias estimadas no convergen "
+               "a la verdad al agregar localizaciones, y el sesgo baja como ~1/N (con N fotones por "
+               "localización), no con el número de localizaciones %s. A N = 100 el ajuste de potencias libres es "
+               "inestable/degenerado %s. Por eso las filas “honesto” con potencias libres de "
+               "<code>study_v2.json</code> no se usan aquí como resultado. Recomendación: calibrar las potencias "
+               "aparte, con N alto, y pasarlas como conocidas.</p>" % (ns_tag, ref_tag))
+    out.append("<p class='muted'>Detalle del verificador: %s</p>" % E(claim_text("Potencias libres compartidas")))
     return "".join(out)
 
 
@@ -878,6 +1070,28 @@ def s_mezcla():
              "%s de fondo %s. El verificador reprodujo la validación con otro λ y otras semillas %s.</p>" % (
                  pct(w0.get("leak_from_other_beams", 0), 2), pct(w0.get("background", 0), 1), mv_src(),
                  mixclaim_src("MIX-VALID")))
+    rep = v.get("variant_Nb0_replica")
+    orig = v.get("variant_Nb0")
+    if rep:
+        otxt = ""
+        if orig and orig.get("chi2_pvalue_mixing") is not None:
+            otxt = ("La variante sin fondo de la validación (N<sub>b</sub> = 0, %s fotones en ventanas) había dado "
+                    "p = %s para la mezcla, un valor bajo que el verificador marcó como a confirmar %s. " % (
+                        sci(orig["n_detected_total"], 2), pval(orig["chi2_pvalue_mixing"]),
+                        claim_src("claim-nb0", "mixing_validation.json:variant_Nb0")))
+        b.append("<p>%sUna réplica con otra semilla base (%d), mismo setup, %d llamadas y %s fotones en ventanas da "
+                 "χ² = %s y p = %s para la mezcla (desvíos entre %s y %s SE), p = %s para el predictor exacto "
+                 "“highest” y p %s para el ingenuo: el valor bajo fue una fluctuación %s %s "
+                 "<span class='muted'>(réplica corrida en la pasada final; no re-verificada por otra ruta)</span>.</p>"
+                 % (otxt, rep["seed_base"], rep["n_calls_ok"], sci(rep["n_detected_total"], 2), f(rep["chi2_mixing"], 2),
+                    pval(rep["chi2_pvalue_mixing"]), f(min(rep["dev_se_mixing"]), 2), f(max(rep["dev_se_mixing"]), 2),
+                    pval(rep["chi2_pvalue_sim_exp_highest_model"]),
+                    "= 0 numérico" if rep["chi2_pvalue_naive"] == 0 else "= " + pval(rep["chi2_pvalue_naive"]),
+                    src("mix-nb0-replica", "Réplica de variant_Nb0 con otra semilla (results/mixing_validation.json:"
+                        "variant_Nb0_replica)", "script", "scripts/validate_mixing_matrix.py",
+                        detail="python scripts/validate_mixing_matrix.py --only nb0-replica; clave variant_Nb0_replica",
+                        json_file="results/mixing_validation.json"),
+                    fixw_src("fix-nb0", "variant_Nb0_replica", "scripts/validate_mixing_matrix.py")))
     b.append(figure("mixing_validation.png", "Validación de la matriz de mezcla"))
     b.append("<h3>Tasa finita: qué hace <code>sim_exp</code> cuando llegan varios fotones por ciclo</h3>")
     pr = []
@@ -895,11 +1109,113 @@ def s_mezcla():
     b.append("<p><b>Lectura física.</b> <code>sim_exp</code> se queda con el fotón del haz de índice más alto "
              "cuando un ciclo tiene fotones de dos haces (F101); un TCSPC real se queda con el primero. Son sesgos "
              "de signo opuesto. A las tasas del tracking (1–5·10<sup>−3</sup> fotones/ciclo) los dos son ≤ 0.05 SE "
-             "por localización: detectables solo sumando ~10<sup>7</sup> fotones, irrelevantes para una "
-             "localización %s.</p>" % mixclaim_src("MIX-TRACKING"))
+             "por localización %s: detectables solo sumando ≳10<sup>7</sup> fotones (~10<sup>7</sup> a "
+             "5·10<sup>−3</sup>, ~3·10<sup>7</sup> a 3·10<sup>−3</sup>, ~2.5·10<sup>8</sup> a 10<sup>−3</sup>) %s, "
+             "irrelevantes para una localización.</p>" % (mixclaim_src("MIX-TRACKING"), mixclaim_src("MIX-NDETECT")))
     b.append("<p class='muted'>Nota sobre la fórmula del test de aceptación: %s %s</p>" % (
         E(mixclaim_text("MIX-ACCFORMULA")), mixclaim_src("MIX-ACCFORMULA")))
     return section("mezcla", "9. Validación de la matriz de mezcla", "\n".join(b))
+
+
+CHK_LABEL = {"aplica-ok": ("aplica, ok", "st-ok"), "falla": ("falla", "st-refuted"), "no aplica": ("no aplica", "lat")}
+
+
+def _chk_verif():
+    """{ítem: (status, texto)} desde el bloque claims de r03-verifier-checklist.md (CHK-<n> ...)."""
+    out = {}
+    for c in CHKV or []:
+        m = re.match(r"\s*CHK-?(\d+)\b", c.get("text", ""))
+        if m:
+            out[int(m.group(1))] = (c.get("status", "unclear"), c.get("text", ""))
+    return out
+
+
+def _link_ids(s):
+    return re.sub(r"\b(F\d{3})\b", r"<a href='#\1'>\1</a>", E(s))
+
+
+def s_checklist():
+    if not CHECKLIST:
+        return ""
+    ck = src("simuflux-checklist", "Auditoría del legado contra los 21 ítems de errores frecuentes de simulaciones "
+             "MINFLUX de SimuFLUX (results/simuflux_checklist.json)", "data", "results/simuflux_checklist.json",
+             detail="sha256 %s; worker R3 (reports/r03-simuflux-checklist.md)" % sha256("results/simuflux_checklist.json"),
+             json_file="results/simuflux_checklist.json")
+    lit = src("simuflux-ref", "Checklist de errores frecuentes en simulaciones MINFLUX derivado de SimuFLUX "
+              "(Marin & Ries, Nat. Commun. 2025)", "source",
+              "Marin & Ries, Nat. Commun. (2025), SimuFLUX; lista de 21 ítems en "
+              "GithubPRO/donut-beam-localization/docs/literature/C_insilico_vs_donutloc.md §5 (solo lectura)")
+    ver = _chk_verif()
+    pending = CHKV is None
+    cnt = {}
+    for x in CHECKLIST:
+        cnt[x["estado"]] = cnt.get(x["estado"], 0) + 1
+    vst = {}
+    for s_, _ in ver.values():
+        vst[s_] = vst.get(s_, 0) + 1
+    if pending:
+        vnote = ("<p><span class='badge st-unclear'>verificación: pendiente</span> La auditoría la hizo un worker "
+                 "de R3; el verificador independiente del checklist todavía no la reprodujo, así que la columna "
+                 "“verificación” dice <i>pendiente</i> en todas las filas y ningún ítem se usa como resultado en "
+                 "el resto del documento.</p>")
+    else:
+        vnote = ("<p>Verificación independiente del checklist (<code>%s</code>): %s. Donde el verificador refutó "
+                 "una fila, su corrección figura en la columna “verificación” y prevalece sobre el estado del worker "
+                 "%s.</p>" % (CHKV_REL, ", ".join("%d %s" % (v, k) for k, v in sorted(vst.items())) or "sin filas CHK",
+                             src("chk-verifier", "Verificación independiente del checklist SimuFLUX", "source",
+                                 CHKV_REL, detail="bloque claims, entradas CHK-<n>")))
+    rep = JOB + "/reports/r03-simuflux-checklist.md"
+    credit = src("chk-credit", "Lo que el legado hace bien según el checklist SimuFLUX (resumen del worker R3)",
+                 "source", rep, detail="sección 'Resultado'")
+    b = ["<p>SimuFLUX (Marin &amp; Ries, Nat. Commun. 2025) documenta los errores más frecuentes al simular MINFLUX "
+         "%s. Se auditó <code>legacy/p-minflux-main</code> contra sus 21 ítems %s: %s.</p>" % (
+             lit, ck, ", ".join("%d %s" % (cnt.get(k, 0), w) for k, w in (("aplica-ok", "aplican y están bien"), ("falla", "fallan"),
+                                                        ("no aplica", "no aplican")))),
+         vnote,
+         "<p><b>Lo que hizo bien, que es la mayor parte</b> %s: la normalización de la dona es explícita y el cero se "
+         "refiere al pico del anillo, como en Balzarotti; la comparación honesta/ingenua es exactamente el diseño que "
+         "pide SimuFLUX; la escalera <code>geom_exp</code>/<code>exp</code> separa la geometría de la forma de la "
+         "dona; el fwhm está ajustado a las donas medidas y es el mismo en los datos y en el estimador; la "
+         "convención ×1.2 está documentada; el RMSE lleva la raíz, promedia por eje y coincide con la convención "
+         "del CRB (lo validó ella misma, documento §4.2); y advirtió el efecto del tamaño de la perla.</p>" % credit]
+    rows = []
+    for x in CHECKLIST:
+        n = x["item"]
+        lab, cls = CHK_LABEL.get(x["estado"], (x["estado"], "lat"))
+        if pending:
+            vcell = "<span class='badge st-unclear'>pendiente</span>"
+        elif n in ver:
+            s_, t_ = ver[n]
+            vcell = "<span class='badge st-%s'>%s</span> <span class='muted'>%s</span>" % (
+                "ok" if s_ == "verified" else s_, E(s_), E(t_))
+        else:
+            vcell = "<span class='badge st-unclear'>sin fila CHK</span>"
+        refuted = (not pending) and n in ver and ver[n][0] == "refuted"
+        est = "<span class='badge %s'>%s</span>" % (cls, E(lab))
+        if refuted:
+            est = "<s>%s</s> <span class='warn'>ver verificación</span>" % est
+        ref = x.get("ref_finding_or_script") or ""
+        rtag = ""
+        m = re.match(r"(scripts/findings/[\w.]+\.py)", ref)
+        if m and exists(m.group(1)):
+            rtag = src("chk-%d" % n, "Checklist SimuFLUX ítem %d (%s): %s" % (n, x["estado"], x.get("numero") or ""),
+                       "script", m.group(1), detail="results/simuflux_checklist.json ítem %d" % n)
+        num = x.get("numero")
+        ev = ("<b>%s</b> " % E(num) if num else "") + (
+            "<details><summary>evidencia</summary>%s%s<br><span class='muted'>Dónde: %s</span></details>" % (
+                E(x.get("evidencia", "")), (" <i>Nota:</i> " + E(x["nota"])) if x.get("nota") else "",
+                E(x.get("legacy_location") or "—")))
+        rows.append("<tr><td>%d</td><td>%s</td><td>%s</td><td>%s</td><td>%s %s</td><td>%s</td></tr>" % (
+            n, E(x["pregunta"]), est, ev, _link_ids(ref) if ref else "—", rtag, vcell))
+    b.append("<div class='scroll'><table class='chk'><tr><th>ítem</th><th>pregunta</th><th>estado</th>"
+             "<th>evidencia</th><th>ref</th><th>verificación</th></tr>%s</table></div>" % "".join(rows))
+    fails = [x for x in CHECKLIST if x["estado"] == "falla"]
+    if fails:
+        b.append("<p><b>Fallas según la auditoría</b> %s:</p><ul>%s</ul>" % (ck, "".join(
+            "<li>Ítem %d — %s <span class='muted'>%s</span></li>" % (
+                x["item"], _link_ids(x.get("nota") or ""), E(x.get("numero") or "")) for x in fails)))
+    return section("simuflux", "10. Auditoría contra el checklist SimuFLUX (Marin & Ries, Nat. Commun. 2025)",
+                   "\n".join(b))
 
 
 def s_limites():
@@ -948,57 +1264,96 @@ def s_limites():
     b.append("<li>%s %s</li>" % (E(claim_text("Sustitución de datos")),
                                                   claim_src("claim-subst", "Sustitución de datos")))
     b.append("<li>%s %s</li>" % (E(claim_text("AUTORIA F101-F111")), claim_src("claim-autoria", "AUTORIA F101-F111")))
-    b.append("<li>%s %s</li>" % (E(claim_text("Rendimiento: el arranque en grilla")),
-                                             claim_src("claim-perf", "Rendimiento: el arranque en grilla")))
+    b.append("<li>%s %s <span class='good'>→ el arranque por bloques quedó resuelto y verificado en R3 %s; sigue "
+             "el punto fijo O(n²) del tiempo muerto a saturación.</span></li>" % (
+                 E(claim_text("Rendimiento: el arranque en grilla")),
+                 claim_src("claim-perf", "Rendimiento: el arranque en grilla"),
+                 claim_src("claim-chunk", "Arranque en grilla por bloques")))
     b.append("<li>Ventanas solapadas (b &gt; T/K): el CRB multinomial deja de valer y el MLE puede caer en un "
-             "óptimo local. En R2 v2 no las rechazaba %s; en R3 se agrega un <code>ValueError</code> explícito "
-             "(salvo <code>allow_overlap=True</code>), pendiente de verificación.</li>"
-             % claim_src("claim-overlap", "Robustez del estimador y del CRB con b > T/K"))
+             "óptimo local. En R2 v2 no las rechazaba %s; en R3 se agregó un <code>ValueError</code> explícito "
+             "(salvo <code>allow_overlap=True</code>), verificado en R3 (<code>simulate_counts</code>, "
+             "<code>crb</code>, <code>mle_mixing</code>, <code>count_windows</code>; las funciones de bajo nivel "
+             "<code>forward_probs</code> y <code>window_probs</code> no lo tienen) %s.</li>"
+             % (claim_src("claim-overlap", "Robustez del estimador y del CRB con b > T/K"),
+                claim_src("claim-guard", "Guard de ventanas solapadas")))
     b.append("</ul>")
-    b.append("<h3 id='abiertos'>Puntos abiertos</h3><p>Afirmaciones del ledger que siguen vivas (refutadas y "
-             "pendientes de corrección en esta ronda, o sin reproducir por otra ruta). No se usan como "
-             "resultados.</p><ul>")
+    fixed, still = [], []
     for i, c in enumerate(CLAIMS):
-        if c["status"] in ("refuted", "unclear"):
-            k = "open-%d" % i
-            b.append("<li><span class='badge st-%s'>%s</span> %s %s</li>" % (
-                c["status"], c["status"], E(c["text"]),
-                src(k, c["text"], "data", JOB + "/state.json",
-                    detail="state.json claims[%d] (status=%s, ronda %s, %s)" % (i, c["status"], c["round"], c["source"]))))
-    b.append("</ul>")
-    b.append(_r3_pending())
+        if c["status"] not in ("refuted", "unclear"):
+            continue
+        grp, why = _open_group(c["text"])
+        li = "<li><span class='badge st-%s'>%s</span> %s %s%s</li>" % (
+            c["status"], c["status"], E(c["text"]),
+            src("open-%d" % i, c["text"], "data", JOB + "/state.json",
+                detail="state.json claims[%d] (status=%s, ronda %s, %s)" % (i, c["status"], c["round"], c["source"])),
+            (" <span class='good'>→ %s</span>" % why) if why else "")
+        (fixed if grp == "fixed" else still).append(li)
+    b.append("<h3 id='abiertos'>Afirmaciones refutadas o sin decidir del ledger</h3><p>Una afirmación refutada o "
+             "<i>unclear</i> sigue viva hasta que se resuelve. Se separan las que ya quedaron corregidas en esta "
+             "revisión (el texto de este documento usa la versión corregida) de las que siguen abiertas. Ninguna se "
+             "usa como resultado en su forma original.</p>")
+    b.append("<h4>Corregido en esta revisión</h4><ul>%s</ul>" % "".join(fixed))
+    b.append("<h4>Sigue abierto</h4><ul>%s</ul>" % "".join(still))
+    b.append(_r3_verified())
     b.append(_next_steps())
-    return section("limites", "10. Límites, supuestos y puntos abiertos", "\n".join(b))
+    return section("limites", "11. Límites, supuestos y puntos abiertos", "\n".join(b))
 
 
-def _r3_pending():
-    """Afirmaciones de los workers de R3 que todavía no pasaron por el verificador."""
+_FW = "pasada final (fix-worker R3): cubierto por tests; revisión independiente parcial"
+# (prefijo del texto en el ledger, grupo, cómo quedó resuelto). Sin entrada = sigue abierto.
+OPEN_MAP = [
+    ("MIX-NDETECT", "fixed", "texto corregido de mixing_claims.json en §9 (~10^7 a 5e-3, ~3·10^7 a 3e-3)"),
+    ("F103-num", "fixed", "tarjeta F103 con 6.84 % / 2.54 % y el desplazamiento 0.88 vs 1.18 nm"),
+    ("F111-comentarios", "fixed", "tarjeta F111 sin “paridad invertida”"),
+    ("F201: la clase CONCEPTUAL", "fixed", "F201 clasificado DISEÑO (inbox R2), cociente ≈2.5 contra el CRB con fuga y crédito a ESTADO…md:115-117"),
+    ("F202 clase IMPLEMENTACION", "fixed", "F202 clasificado DISEÑO, supuesto del máximo del .npy explícito y crédito a ESTADO…md:116"),
+    ("F203: 'el 100 %", "fixed", "tarjeta F203: 100 % solo con R ≤ 1.0·L (71–72 % con 1.25·L)"),
+    ("Robustez del estimador y del CRB con b > T/K", "fixed", "guard de ventanas solapadas agregado y verificado en R3"),
+    ("Rendimiento: el arranque en grilla", "open", "el arranque por bloques quedó resuelto y verificado en R3; sigue el punto fijo O(n²) del tiempo muerto a saturación"),
+    ("El modelo directo del estimador no incluye", "fixed", "resuelto: d = n·T verificado en R2 con prueba y MC; el sesgo residual está documentado en esta sección"),
+    ("Docstring de estimate", "fixed", "flag converged verificado en R3 (docstring corregido)"),
+    ("Usabilidad como reemplazo", "fixed", "README, ejemplo de punta a punta, migración, exports y port de F107 en R3 (§7)"),
+    ("W2-R2 'el valor esperado del doble conteo", "fixed", "referencia corregida a 11.175 %"),
+    ("W3-R2 'el sesgo MC del MLE de mezcla", "fixed", "sesgo residual 0.02–0.035 nm + O(1/N) en esta sección"),
+    ("Reproducibilidad de los tests con sha256", "fixed", "sha256 con fin de línea normalizado (scripts/provenance_sha.py) y .gitattributes; " + _FW),
+    ("count_windows borde de punto flotante", "fixed", "TestFoldEdge; " + _FW),
+    ("Port de F107 (t_mask) contra la convención de SBR", "fixed", "sbr_reference=\"on\"|\"total\" y README §4/§5; " + _FW),
+    ("README como guía de migración", "fixed", "README §9: receta de emulación de sim_exp, fórmula de rate_per_cycle, datos reales, N para crb, exports y cov_ellipse; " + _FW),
+    ("Caption de timeline_20MHz", "fixed", "leyenda corregida: C[i][i] = 0.8973 con la IRF dibujada (0.9092 sin IRF)"),
+    ("Caption de dead_time_sweep", "fixed", "leyenda corregida: p ≥ 0.29, mínimo 0.296"),
+    ("W1-R3 'con N=100 las potencias libres", "fixed", "§8 no usa esos números; dice que a N = 100 el ajuste es inestable/degenerado"),
+    ("report/index.html resumen", "fixed", "resumen corregido (0.112 nm, 0.034 SE)"),
+    ("report/index.html tarjetas F201/F205", "fixed", "tarjetas corregidas (TestStudyV2 es de R3, verificado en R3)"),
+    ("report/index.html seccion 10", "fixed", "esta sección separa lo corregido de lo abierto"),
+    ("mixing_validation.json:variant_Nb0", "fixed", "réplica con otra semilla p = 0.957 (§9); " + _FW),
+    ("W2-R2 'highest reproduce sim_exp' con fondo", "open", "documentado como limitación (supuestos, arriba)"),
+]
+
+
+def _open_group(text):
+    for pre, grp, why in OPEN_MAP:
+        if text.startswith(pre):
+            return grp, why
+    return "open", ""
+
+
+# afirmaciones verificadas de R3 que son sobre este documento o su generación (no son resultados)
+_META = ("report/index.html", "build_report.py", "Privacidad del HTML")
+
+
+def _r3_verified():
+    """Afirmaciones verificadas en la ronda 3 (ledger), sin las que tratan del propio documento."""
     out = []
-    for role in ("worker-1", "worker-2"):
-        rel = JOB + "/reports/r03-%s.md" % role
-        if not exists(rel):
+    for i, c in enumerate(CLAIMS):
+        if c.get("round") != 3 or c.get("status") != "verified" or c.get("text", "").startswith(_META):
             continue
-        with io.open(_p(rel), encoding="utf-8") as fh:
-            txt = fh.read()
-        m = re.search(r"```claims\s*(\[.*?\])\s*```", txt, re.S)
-        if not m:
-            continue
-        try:
-            cl = json.loads(m.group(1))
-        except ValueError:
-            continue
-        verified = {c["text"] for c in CLAIMS if c.get("status") == "verified"}
-        for i, c in enumerate(cl):
-            if c.get("text") in verified:
-                continue
-            out.append("<li>%s %s</li>" % (E(c.get("text", "")), src(
-                "r3-%s-%d" % (role, i), c.get("text", ""), "source", rel,
-                detail="bloque claims de %s, entrada %d (auto-reportada, sin verificar)" % (rel, i))))
+        out.append("<li>%s %s</li>" % (E(c["text"]), src(
+            "r3-ver-%d" % i, c["text"], "data", JOB + "/state.json",
+            detail="state.json claims[%d] (status=verified, ronda 3, %s)" % (i, c.get("source")))))
     if not out:
         return ""
-    return ("<h3>Trabajo de la ronda 3 pendiente de verificación</h3><p>Lo que los workers de R3 reportan y "
-            "el verificador todavía no reprodujo. No se usa como resultado en este documento.</p><ul>%s</ul>"
-            % "".join(out))
+    return ("<h3>Verificado en la ronda 3</h3><p>Lo que el verificador o el revisor de código de R3 reprodujeron "
+            "por su cuenta.</p><ul>%s</ul>" % "".join(out))
 
 
 def _next_steps():
@@ -1015,7 +1370,9 @@ def _next_steps():
     return ("<h3>Lo que más se podría hacer después</h3><p class='muted'>Propuestas del PI (no son resultados) %s.</p><ol>%s</ol>"
             % (src("pi-next", "Lista de próximos pasos del PI (r03)", "source", rel,
                    detail="sección 'LO QUE MÁS SE PODRÍA HACER'"),
-               "".join("<li>%s</li>" % _md_inline(it) for it in items)))
+               "".join("<li>%s%s</li>" % (_md_inline(it), " <span class='good'>→ hecho en R3 y verificado (tarjeta "
+                                          "<a href='#F107'>F107</a>).</span>" if it.startswith("Portar F107") and
+                                          claim("F107 portado")[1] is not None else "") for it in items)))
 
 
 def s_apendice():
@@ -1027,13 +1384,14 @@ def s_apendice():
         "discarded", "Sospechas descartadas y verificadas (F105, F151–F154, D-*, F290-D*)", "data",
         "results/findings_discarded.json"),
          "<div class='scroll'><table><tr><th>id</th><th>sospecha</th><th>evidencia</th><th>estado</th></tr>%s</table></div>" % rows]
-    return section("apendice", "11. Apéndice: sospechas descartadas", "\n".join(b))
+    return section("apendice", "12. Apéndice: sospechas descartadas", "\n".join(b))
 
 
 def s_versiones():
     files = ["results/findings.json", "results/findings_discarded.json", "results/mixing_validation.json",
              "results/mixing_claims.json", "results/mixing_rate_sweep.json", "results/dead_time_sweep.json",
-             "results/compare_legacy_vs_v2.json", "results/study_v2.json", "report/figs/captions.json",
+             "results/compare_legacy_vs_v2.json", "results/study_v2.json", "results/simuflux_checklist.json",
+             "report/figs/captions.json",
              JOB + "/state.json", "scripts/build_report.py"]
     rows = "".join("<tr><td><code>%s</code></td><td><code>%s</code></td></tr>" % (
         E(r), (sha256(r) or "ausente")[:16]) for r in files)
@@ -1103,6 +1461,8 @@ details summary{cursor:pointer;color:var(--accent);font-size:.92rem}
 .ph{background:var(--ph);border:2px dashed var(--c-dis);border-radius:6px;padding:14px;text-align:left}
 .ph-inline{background:var(--ph);padding:0 .3em}
 .warn{color:var(--warn)}
+.privado{border:2px solid var(--warn);color:var(--warn);border-radius:6px;padding:6px 12px;margin:0 0 10px}
+table.chk td:nth-child(2){min-width:220px}table.chk td:nth-child(4){min-width:200px}
 .claim{font-size:.92rem;border-left:3px solid var(--line);padding-left:10px}
 .bar{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0}
 .bar button{font:inherit;font-size:.85rem;padding:3px 10px;border:1px solid var(--line);background:var(--card);
@@ -1126,7 +1486,8 @@ def build():
     del PLACEHOLDERS[:]
     PROV.clear()
     body = [s_resumen(), s_metodo(), s_crimen(), s_findings(), s_bien(), s_distinto(), s_v2(), s_resultados(),
-            s_mezcla(), s_limites(), s_apendice(), s_versiones()]
+            s_mezcla(), s_checklist(), s_limites(), s_apendice(), s_versiones()]
+    body = [x for x in body if x]
     ids = "".join("<a href='#%s'>%s</a>" % (x["id"], x["id"]) for c in CLASS_ORDER
                   for x in FINDINGS if x["class"] == c)
     toc = "<nav class='toc'><b>Contenido</b><ol>%s</ol><div class='ids'>Hallazgos: %s</div></nav>" % (
@@ -1141,6 +1502,7 @@ def build():
 <meta name="description" content="Revisión crítica del simulador p-MINFLUX legado y versión v2 (privado).">
 <style>{css}</style></head>
 <body><div class="wrap">
+<div class="privado"><b>Documento privado: contiene datos no publicados; no compartir sin revisar.</b></div>
 <p class="muted">Documento privado · revisión agent-team <code>{job}</code> · generado {now} por <code>scripts/build_report.py</code></p>
 <h1>Revisión del simulador p-MINFLUX: qué estaba mal, qué estaba bien y la versión v2</h1>
 <p class="muted">Hallazgos clasificados como <b>conceptual</b>, <b>implementación</b> o <b>diseño</b>. Los
@@ -1152,6 +1514,13 @@ números entre corchetes <span class="src">&#91;src:clave&#93;</span> remiten a 
 {body}
 </div><script>{js}</script></body></html>
 """.format(css=CSS, job=JOB, now=now, ph=ph, toc=toc, body="\n".join(body), js=JS)
+    page = scrub(page)
+    for v in PROV.values():
+        for k in ("statement", "reproduce", "detail"):
+            if isinstance(v.get(k), str):
+                v[k] = scrub(v[k])
+        if "also" in v:
+            v["also"] = [scrub(a) for a in v["also"]]
     os.makedirs(os.path.dirname(OUT_HTML), exist_ok=True)
     with io.open(OUT_HTML, "w", encoding="utf-8") as fh:
         fh.write(page)
