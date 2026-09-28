@@ -533,6 +533,216 @@
    "text": "W2-R2 'highest reproduce sim_exp' con fondo a tasa alta — v2 fija el SBR incidente y recorta la señal registrada por (1-e^-x)/x, mientras sim_exp fija Ns:Nb registrados; a 0.0105/ciclo es 0.5 % del SBR (despreciable) y a 0.3/ciclo con fondo ~14 %; los tests de highest usan sbr=inf. Falta decidir si se documenta como limitación",
    "round": 2,
    "source": "verifier"
+  },
+  {
+   "status": "verified",
+   "text": "Suite completa en el árbol de trabajo original (python -m unittest discover -s tests, Py 3.8.6): Ran 64 tests in 118.4 s, OK",
+   "round": 3,
+   "source": "code-reviewer"
+  },
+  {
+   "status": "refuted",
+   "text": "Reproducibilidad de los tests con sha256: en un git clone nuevo con core.autocrlf=true (default Windows) fallan test_compare_json_complete y test_study_v2_json (64 tests, 2 failures) porque _sha hashea bytes crudos y los .py salen CRLF (mixing.py e3acbbd2 -> 9cea5a4d); los números no cambian (study_v2.json regenerado idéntico, PNG idénticos); build_report reescribe los sha de provenance/HTML. Arreglo: normalizar CRLF->LF antes de hashear o .gitattributes *.py eol=lf",
+   "round": 3,
+   "source": "code-reviewer"
+  },
+  {
+   "status": "verified",
+   "text": "Guard b>T/K: simulate_counts, crb, mle_mixing y count_windows levantan ValueError con b=20,T=50,K=4; allow_overlap=True emite exactamente 1 UserWarning; b=T/K (y 50/3 con K=3) no levanta; resuelve el refuted R2 (claims[56])",
+   "round": 3,
+   "source": "code-reviewer"
+  },
+  {
+   "status": "verified",
+   "text": "count_windows: semántica medio abierta [i·T/K+a, +b) mod T correcta (bordes [0,10.1,12.5,22.6]->[1,1,0,0]; cruce de T; a<0; tiempos absolutos macro·50+micro hasta 2^40 ns idénticos); igual a nMINFLUX con a=0 y recupera las cuentas de w0 que el legado pierde con a=-1 (F103); iguala exactamente los counts del simulador desde return_tags; validaciones de macro_index/NaN funcionan",
+   "round": 3,
+   "source": "code-reviewer"
+  },
+  {
+   "status": "unclear",
+   "text": "count_windows borde de punto flotante: con b=T/K exacto, un microtiempo 1 ulp por debajo de a (nextafter(0.5,0) con a=0.5, o -1e-17 con a=0) se pliega a fase==T y no cae en ninguna ventana (debería ir a K-1); irrelevante con datos reales, sin test",
+   "round": 3,
+   "source": "code-reviewer"
+  },
+  {
+   "status": "verified",
+   "text": "Arranque en grilla del MLE por bloques (chunk): bucle argmax por bloques trivialmente idéntico; el test lo confirma bit a bit en fijo/free_bg/legacy/free_powers",
+   "round": 3,
+   "source": "code-reviewer"
+  },
+  {
+   "status": "verified",
+   "text": "Flag converged: si se agota maxiter con dNLL<=1e-6 en 10 iteraciones se marca True; la lógica es correcta, las estimaciones no cambian y el test acota el hueco de NLL a <=1e-5 y la distancia a <0.05 nm; docstring free_bg 1.000-1.038x corregido; resuelve U R2 claims[60]",
+   "round": 3,
+   "source": "code-reviewer"
+  },
+  {
+   "status": "refuted",
+   "text": "Port de F107 (t_mask) contra la convención de SBR del README §5 (Ns/Nb del ciclo completo): con t_mask 50% encendido y sbr=21 el SBR detectado es 10.5 (fondo 0.0869) y mle_mixing(sbr=21) sesga (-0.26,-0.36) nm = 5-7 SE (~0.48 CRB por loc); en el legado Ns/Nb quedaban fijos. La semántica 'sbr de los ciclos encendidos' está solo en el docstring y hay que documentarla en README §4/§5",
+   "round": 3,
+   "source": "code-reviewer"
+  },
+  {
+   "status": "verified",
+   "text": "README al pie de la letra en un clon + venv: pip install -e . (con internet) OK; el fallo offline con setuptools 49 sin wheel está advertido; inicio rápido §2 corre fuera del repo (15.7 s, sesgo de la mezcla 0.03/0.04 nm, CRB 0.933); example_end_to_end 7.9 s; study_misalignment_v2 56.8 s y study_v2.json idéntico al commiteado; figuras idénticas",
+   "round": 3,
+   "source": "code-reviewer"
+  },
+  {
+   "status": "unclear",
+   "text": "README como guía de migración: (1) no dice que para emular sim_exp hay que poner irf_fwhm=0 y dead_time=0 además de tcspc='highest'; con la IRF por defecto, tau=0.001 y b=T/K, C manda el 49.7% a la ventana anterior (autovalor 0.006): mle_mixing da 15.6 nm y mle_legacy 30.7 nm con 92% en el borde, sin aviso; (2) no da la fórmula de M_p/factor a rate_per_cycle; (3) no explica cómo llevar microtiempos reales (offset del sync o del pulso 0, retardos τ no equiespaciados, que nMINFLUX sí aceptaba) a la convención i·T/K; (4) no aclara qué N pasarle a crb con datos reales (return_outside); (5) dice que check_overlap, donut y gaussian se importan desde pminflux_sim y es falso (AttributeError); (6) el orden de argumentos de cov_ellipse cambió (q y nsig) sin advertencia",
+   "round": 3,
+   "source": "code-reviewer"
+  },
+  {
+   "status": "verified",
+   "text": "Afirmaciones del README contra el código: C[i,i]=0.8973 y C[i+1,i]=0.0467 (IRF 0.3); defaults dead_time=22 e IRF 0.3 centrada marcados como supuestos; d=n·T citado como verificado en R2; texto corregido del sesgo residual; tabla study_v2 igual al JSON",
+   "round": 3,
+   "source": "code-reviewer"
+  },
+  {
+   "status": "verified",
+   "text": "build_report.py: números leídos de los JSON (120/120 valores |b| y RMSE/CRB de compare en el HTML, p=0.129); check_provenance 93/93/0 errores; HTML autocontenido (0 http, 0 link/@import/url(), 6 imágenes data:, un solo script inline de 5 líneas que funciona offline); reproducible salvo marca de tiempo y sha. Tipeados a mano solo los recuadros de corrección del verificador (coinciden con findings.json) y '≤0.05 SE' en §9",
+   "round": 3,
+   "source": "code-reviewer"
+  },
+  {
+   "status": "unclear",
+   "text": "Caption de timeline_20MHz.png (make_report_figures.py): dice 'IRF gaussiana 0.3 ns … C[i][i]=0.9092', pero 0.9092 es C sin IRF (con IRF 0.3 es 0.8973); lo aclara solo al final; la sección 3 del HTML sí distingue ambos",
+   "round": 3,
+   "source": "code-reviewer"
+  },
+  {
+   "status": "verified",
+   "text": "Privacidad del HTML: no contiene usuario de Windows, email ni C:\\Users; sí contiene la ruta C:\\Data\\psf\\20260820, 'GithubPRO/p-minflux-main', nombres de Masullo/López/Richter y datos no publicados de la autora (τ=4.21 y [0,10.1] de 20260707, máximos de PSF de 20260703/0707/0924, potencias 21.02/16.65/22.96/22.86, números Experimental 18.35/62.76/1.89, referencias al .docx, NOTAS.txt, run_final.log y 42 citas archivo.py:línea): no compartir sin su consentimiento",
+   "round": 3,
+   "source": "code-reviewer"
+  },
+  {
+   "status": "verified",
+   "text": "R3 suite: python -m unittest discover -s tests = 64 tests OK (67.8 s, Py 3.8); tests.test_acceptance 6/6 OK incluido test_html_report_covers_every_finding; sha256 de test_acceptance.py = 5ad01fba...d457c intacto; check_provenance 93/93 sin errores",
+   "round": 3,
+   "source": "verifier"
+  },
+  {
+   "status": "verified",
+   "text": "study_v2 (N=2095, 5 posiciones continuas, setup medido, earliest d=22, IRF 0.3, 2.5e-3/ciclo) reproducido con simulador, MLE y CRB propios y otra semilla: mezcla con potencias conocidas max|b| 0.096 (ideal) / 0.059 nm (desalineada) vs 0.117/0.086, RMSE/CRB 0.984/1.002 vs 0.996/1.003; legado Ec. 3.5 3.107/3.142 nm vs 3.116/3.176, RMSE/CRB 1.638/1.724 vs 1.671/1.726; ingenuo desalineado 8.606 nm y 4.083 vs 8.583 y 4.093; mezcla con P conocidas max|b| <=0.12 nm y RMSE/CRB ~1.00; fraccion en el borde 0",
+   "round": 3,
+   "source": "verifier"
+  },
+  {
+   "status": "verified",
+   "text": "study_v2: CRB por eje con fuga identico a 3 decimales en 5 posiciones x 2 geometrias x N=100/400/1600/2095; geometria ingenua L_eff=103.0686 nm, phi=1.61107 rad",
+   "round": 3,
+   "source": "verifier"
+  },
+  {
+   "status": "verified",
+   "text": "study_v2 barrido de eficiencia N=100/400/1600 (RMSE/CRB medio) reproducido dentro de <=0.08 (~2-3 SE): legado ideal 1.185/1.212/1.513 (W1 1.216/1.240/1.534), legado desalineada 1.151/1.246/1.585 (1.098/1.239/1.622), ingenuo 1.416/2.014/3.568 (1.365/2.041/3.645), mezcla P conocidas ideal 1.095/1.029/0.982 (1.067/0.998/0.999): el legado y el ingenuo empeoran con N, la mezcla con P conocidas queda ~1",
+   "round": 3,
+   "source": "verifier"
+  },
+  {
+   "status": "verified",
+   "text": "Potencias libres compartidas + una posicion por localizacion: sesgo de parametros incidentales (Neyman-Scott) confirmado con perfil de verosimilitud propio (EBP desalineado, verdad 0.792/1.092/1.088): N=400 da 0.851/1.172/1.187 con 1600 locs/pos y 0.856/1.177/1.199 con 3200 (W1 0.847/1.160/1.188), no converge a la verdad y NLL(verdad)-NLL(hat) crece ~lineal con n (38 -> 87); el sesgo baja ~1/N (N=1600: 0.801/1.106/1.104; N=2095: 0.791/1.093/1.082); tambien en la geometria ideal (+7 % a N=400)",
+   "round": 3,
+   "source": "verifier"
+  },
+  {
+   "status": "refuted",
+   "text": "W1-R3 'con N=100 las potencias libres dan 1.056/1.408/1.536 con 1600 locs por posicion e inestable con pocas (3.0/3.9/9.3 con 100)' — con datos propios de 1600/pos el maximo del perfil es la solucion desbocada 3.00/3.97/8.86 (12 % en el borde, max|b| 25.7 nm); el punto 1.056/1.408/1.536 tiene NLL 626 mayor y Nelder-Mead desde el (o desde potencias iguales) llega a 3.00/3.97/8.86; con 100/pos se obtienen optimos locales 1.0-1.15/1.4-1.6/1.4-1.8. Lo que se sostiene: a N=100 el ajuste de potencias libres es inestable/degenerado",
+   "round": 3,
+   "source": "verifier"
+  },
+  {
+   "status": "verified",
+   "text": "Guard de ventanas solapadas: con b=20, T=50, K=4 simulate_counts, estimate.crb, estimate.mle_mixing y windows.count_windows levantan ValueError 'ventanas solapadas'; con allow_overlap=True emiten un UserWarning y siguen; b=T/K=12.5 no avisa y b=12.5000001 levanta; forward_probs y mixing.window_probs no tienen guard",
+   "round": 3,
+   "source": "verifier"
+  },
+  {
+   "status": "verified",
+   "text": "windows.count_windows coincide bit a bit con los counts de simulate_counts desde return_tags (4 setups incl. ventana que cruza T y a<0), da lo mismo con tiempos absolutos, coincide con una regla propia mod(t-(iT/K+a),T)<b y con intervalos explicitos en 2e5 tiempos uniformes; sobre datos del simulador propio a 1e-4/ciclo (3.75e5 fotones) chi2 contra C propia p=0.67; window_probs = modelo propio exacto",
+   "round": 3,
+   "source": "verifier"
+  },
+  {
+   "status": "verified",
+   "text": "Arranque en grilla por bloques: mle_mixing (fijo, free_bg, free_powers) y mle_legacy dan r, converged y powers identicos bit a bit con chunk=1, 13 y el default; chunk=0 -> ValueError",
+   "round": 3,
+   "source": "verifier"
+  },
+  {
+   "status": "verified",
+   "text": "F107 portado: con t_mask y sin fondo no hay fotones de señal de ciclos de excitacion apagados (por ciclo de llegada aparece solo la cola que cruza el borde de ciclo, 1.4 % de la señal con mascara alternante, fisica correcta); con SBR 5 la fraccion de fotones en la mitad apagada es 1/7 (0.1423-0.1427, |z|<=1.5, dos fases y bloques de 2000 ciclos, none y earliest); mascara toda 1 = sin mascara bit a bit",
+   "round": 3,
+   "source": "verifier"
+  },
+  {
+   "status": "verified",
+   "text": "converged: con 6000 locs N=10-50 quedan 6 converged=False (W1: 5); en 600 casos converged=True interiores Nelder-Mead propio mejora la NLL <=9.3e-8 y mueve <=0.0075 nm; los no convergidos estan 0.21 nm y 3.5e-5 de NLL fuera del optimo",
+   "round": 3,
+   "source": "verifier"
+  },
+  {
+   "status": "unclear",
+   "text": "W1-R3 'converged=False baja de 43 a 5 con el cambio' — no esta el codigo previo para comparar; solo se verifico el comportamiento actual",
+   "round": 3,
+   "source": "verifier"
+  },
+  {
+   "status": "verified",
+   "text": "compare_legacy_vs_v2.json regenerado en R3: source v2sim, sha256 de mixing/psf/estimate/simulate/script iguales a los archivos actuales, y los 100 numeros (|b| y RMSE/CRB de legado, mezcla y free_bg) coinciden a 3 decimales con work/compare_rerun.txt de R2",
+   "round": 3,
+   "source": "verifier"
+  },
+  {
+   "status": "verified",
+   "text": "Figuras report/figs: los numeros de los 6 captions coinciden con sus JSON (timeline C[1][0]=0.0467; validacion chi2 5.66 p=0.129 y 1927, desvios +27.6/-32.8; rate_sweep 0.009/0.026/0.086/0.90/3.06 y 0.093/0.097; legacy_vs_v2 0.57-2.69 nm, 1.12-2.06, mezcla 0.011-0.112, 0.982-1.022; f201 0.11->2.98, 1.07->2.75, 2.51 contra 0.945; dead_time d=50 0.012-0.024, d=100 0.015-0.034, d=22 0.030/0.057/0.079/0.099)",
+   "round": 3,
+   "source": "verifier"
+  },
+  {
+   "status": "refuted",
+   "text": "Caption de timeline_20MHz 'C[i][i] = 0.9092' junto al panel que dibuja la IRF de 0.3 ns — 0.9092 es sin IRF; con la IRF dibujada es 0.8973 (C[1][0]=0.0467 vale para ambos). Menor",
+   "round": 3,
+   "source": "verifier"
+  },
+  {
+   "status": "refuted",
+   "text": "Caption de dead_time_sweep 'p del chi2 contra la mezcla >= 0.30' para d=50/100 — el minimo es 0.296 (d=100, 5.5e-3). Menor",
+   "round": 3,
+   "source": "verifier"
+  },
+  {
+   "status": "verified",
+   "text": "report/index.html: las clases de las 16 tarjetas coinciden con findings.json (1 CONCEPTUAL, 9 IMPLEMENTACION, 6 DISENO), las correcciones literales de los verificadores (F103, F111, F201, F203, F204, F205, MIX-NDETECT, sesgo residual) estan aplicadas, hay credito explicito (seccion 5 y 'que estaba bien' por tarjeta, Masullo en F201), el tono atribuye el error al metodo, y el 'crimen inverso' esta bien explicado; tablas F104, 20 casos, C, validacion, barridos de tasa y tiempo muerto coinciden con los JSON",
+   "round": 3,
+   "source": "verifier"
+  },
+  {
+   "status": "refuted",
+   "text": "report/index.html resumen 'mezcla |b| <= 0.11 nm' y 'd = n·T ... <= 0.033 SE' — el JSON da max 0.112 nm (0.11197) y 0.034 SE (0.0337; la propia tabla de la seccion 10 dice 0.034)",
+   "round": 3,
+   "source": "verifier"
+  },
+  {
+   "status": "refuted",
+   "text": "report/index.html tarjetas F201/F205: 'los tests v2 de los hallazgos existen y pasan (verificado en R2)' incluye tests/test_usability.py::TestStudyV2::test_study_v2_json, que es de R3",
+   "round": 3,
+   "source": "verifier"
+  },
+  {
+   "status": "refuted",
+   "text": "report/index.html seccion 10 'Puntos abiertos ... siguen vivas (refutadas y pendientes de correccion en esta ronda)' — la mayoria (MIX-NDETECT, F103-num, F111, clases F201/F202, F203, 11.15 %, <=0.11 nm, guard b>T/K, docstring/converged, usabilidad) ya esta corregida en el mismo documento, y el unclear 'd = n*T no verificada' contradice la seccion 10 que lo da (correctamente) por verificado en R2",
+   "round": 3,
+   "source": "verifier"
+  },
+  {
+   "status": "unclear",
+   "text": "mixing_validation.json:variant_Nb0 (lambda de W1, Nb=0, 2.07e6 fotones) da p=0.0078 para la mezcla (-2.9 SE en w0), mientras MIX-VALID con otro lambda da p=0.61; no se cita en el HTML; probablemente fluctuacion, falta una repeticion con otra semilla para decidir",
+   "round": 3,
+   "source": "verifier"
   }
  ],
  "plan": [

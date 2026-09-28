@@ -1,0 +1,581 @@
+
+Revisión pminflux-sim
+Documento privado · revisión agent-team equipo/2026-09-28_review-pminflux-sim · generado 2026-09-28 14:32 por scripts/build_report.py
+### Revisión del simulador p-MINFLUX: qué estaba mal, qué estaba bien y la versión v2
+Hallazgos clasificados como conceptual, implementación o diseño. Los
+números entre corchetes [src:clave] remiten a out/provenance.json.
+Expandir todoContraer todo
+Claro / oscuroImprimir
+Borrador con partes pendientes: resultados de study_v2.json (pendientes de verificación).
+Contenido
+Resumen ejecutivo
+Cómo se revisó
+El error conceptual central: el “crimen inverso” (F104 + F201)
+Hallazgos por clase
+Lo que estaba bien
+Qué podría haber hecho distinto
+La versión mejorada
+Resultados: legado contra v2
+Validación de la matriz de mezcla
+Límites, supuestos y puntos abiertos
+Apéndice: sospechas descartadas
+Hallazgos: F104F101F102F103F107F108F109F110F111F205F106F201F202F203F204F206
+### 1. Resumen ejecutivo
+Revisamos el simulador p-MINFLUX de legacy/p-minflux-main con la experiencia del setup pulsado a 20 MHz (T = 50 ns, K = 4, τ = 4.21 ns, ventana [0, 10.1] ns) [src:mix-valid]. Resultado: 16 hallazgos verificados (1 conceptual, 9 de implementación, 6 de diseño) [src:findings-all], de los cuales 7 son latentes (no cambian ningún número publicado). El código hace, en general, lo que dice; el problema de fondo es metodológico.
+La matriz de mezcla es correcta y necesaria. Con τ = 4.21 ns y pulsos cada 12.5 ns, un 4.7 % de los fotones de cada haz cae en la ventana del haz siguiente (Ci,i−1 = 0.0467) [src:mix-valid]. El modelo de mezcla describe sim_exp (χ² p = 0.129 con 4.16·106 fotones detectados); el modelo ingenuo de la Ec. 3.5 queda rechazado (χ² = 1927, p = 0 numérico) [src:mixclaim-MIX-VALID].
+El error conceptual central es el “crimen inverso” (§3): los estudios simulan con el mismo modelo que usa el estimador (sin fuga, ventanas que cubren el ciclo), así que no pueden ver que ese modelo no describe el instrumento. En el setup medido el MLE de la Ec. 3.5 tiene un sesgo asintótico de 0.85–2.69 nm (SBR 21, 5 posiciones) [src:cmp-cases] [src:F104]; el ideal “honesto” de los estudios pasa de |b| ≈ 0.1 nm a ≈ 3 nm cuando se enciende la fuga [src:F201].
+La versión v2 (src/pminflux_sim) simula en dominio temporal (τ, IRF, ventanas periódicas, TCSPC de primer fotón, tiempo muerto) y estima con la matriz de mezcla. Sobre los mismos datos, en 20 casos: legado |b| 0.57–2.69 nm y RMSE/CRB 1.12–2.06; mezcla |b| ≤ 0.11 nm y RMSE/CRB 0.98–1.02 [src:cmp-cases].
+Tiempo muerto. Con un tiempo muerto de 22 ns (supuesto) y 0.0105 fotones/ciclo, el sesgo por ventana es ≤ 0.10 SE por localización; con d = n·T (50 o 100 ns) se anula exactamente (≤ 0.033 SE, ruido MC) [src:dt-sweep] [src:claim-dnT].
+Lo que estaba bien (§5): el pliegue periódico de sim_exp ya modelaba la fuga; la validación del término de fondo; la corrección de spaceToIndex; el diseño honesto/ingenuo con comparación justa; y la autora ya había anotado como pendientes el τ y la IRF medidos, las potencias distintas por haz y la trazabilidad de los logs.
+### 2. Cómo se revisó
+La revisión se hizo con la metodología agent-team: un equipo acotado (PI, workers, verificador, revisor de código y este redactor) en 3 rondas. Cada resultado lo produjo un worker y lo reprodujo un verificador independiente por otro camino (simulador fotón por fotón propio, cuadraturas propias, otras semillas), sin ver el razonamiento del worker. Solo lo que el verificador reprodujo entra como verificado; lo refutado se corrigió y lo no reproducido figura como unclear en §10.
+Estado del ledger al generar este reporte: 8 refuted, 10 unclear, 66 verified [src:ledger].
+Cada número de este documento lleva una etiqueta [src:clave], que resuelve en equipo/2026-09-28_review-pminflux-sim/out/provenance.json con el archivo, la clave y el script que lo reproduce. El documento lo genera scripts/build_report.py leyendo los JSON: nada se tipea a mano.
+### Criterio de clases
+ | Clase | Criterio | Pregunta que responde
+ | Conceptual | El modelo físico o estadístico está mal: el resultado es incorrecto aunque el código haga lo que pretende. | ¿Está bien la física?
+ | Implementación | El código no hace lo que dice o pretende (bug). | ¿El código hace lo que dice?
+ | Diseño | Decisión defendible que limita el alcance o la validez: parámetro por defecto, supuesto no declarado, tamaño de Monte Carlo, forma de reportar. | ¿El estudio responde la pregunta que plantea?
+Texto del criterio en el registro: “CONCEPTUAL = el modelo fisico o estadistico esta mal (el resultado es incorrecto aunque el codigo haga lo que pretende); IMPLEMENTACION = el codigo no hace lo que dice o pretende (bug); DISENO = decision defendible que limita el alcance o la validez. 'Latente' = no afecta a ningun numero publicado por la autora con su configuracion actual.” [src:criterion]. Latente = no cambia ningún número publicado por la autora con su configuración actual. Decisiones de clase tomadas en la ronda 2 (inbox): F104 es CONCEPTUAL; F201 y F202 son DISEÑO, porque el código hace lo que dice y el problema es un supuesto no declarado (F201) o una convención documentada (F202).
+Autoría. No hay historial git (tampoco en la copia original), así que la autoría de cada línea es no verificable salvo lo que sostuvo el verificador A: el docstring [Lars] de ebp_centres y que el comentario “EXACTAMENTE” y la ruta rápida de sim_exp están en el español de la autora [src:claim-autoria]. Donde el registro dice “autora”, la base es la declaración de NOTAS.txt (atribución por exclusión). En todos los casos el error se atribuye al método, no a la persona.
+### 3. El error conceptual central: el “crimen inverso” (F104 + F201)
+En una frase. Si simulás los datos con el mismo modelo directo que usa el estimador, el estudio solo mide la varianza del estimador bajo su propio modelo: por construcción alcanza el CRB, y queda ciego a cualquier diferencia entre ese modelo y el instrumento. En problemas inversos a esto se lo llama “crimen inverso”.
+### Qué pasa físicamente a 20 MHz
+En p-MINFLUX pulsado el ciclo TCSPC dura T = 50 ns y los K = 4 haces se disparan intercalados, uno cada T/K = 12.5 ns. Cada fotón llega con un retardo exponencial de vida media τ = 4.21 ns respecto de su pulso, y se asigna al haz según la ventana de microtiempo en la que cae: la ventana i es [i·T/K + a, i·T/K + a + b] con a = 0 y b = 10.1 ns [src:mix-valid].
+Con estos números la cola del decaimiento no termina antes del pulso siguiente: una fracción e−12.5/4.21 = 5.1 % de los fotones de un haz llega después del pulso del haz siguiente [src:deriv-tail]. La parte de esa cola que cae dentro de la ventana siguiente es Ci,i−1 = 0.0467 (el 4.7 %), el haz propio retiene Cii = 0.9092, y un 4.16 % de cada haz cae fuera de todas las ventanas (suma de columna 0.9584) [src:mix-valid] [src:mixclaim-MIX-C]. Con la IRF gaussiana de 0.3 ns FWHM (supuesta) Cii = 0.8973 y Ci,i−1 = 0.0467 [src:mixclaim-MIX-IRF].
+¿Por qué importa tanto un 4.7 %? Porque en MINFLUX la información está en el haz que menos fotones da: el emisor está cerca del cero de una dona, y ese haz es justamente el más contaminado por los vecinos. En (5, −5) nm la ventana 0 tiene un 45.8 % de fotones de otros haces [src:F104]. El estimador de la Ec. 3.5 (pos_MINFLUX, crb_minflux) supone pi = s·λi/Σλ + (1 − s)/K: sin fuga, y con el fondo repartido en K ventanas que cubren el ciclo. Lee esos fotones prestados como señal del haz propio y corre la posición.
+[IMG alt=Línea de tiempo del ciclo a 20 MHz y fuga entre pulsos]
+Línea de tiempo del ciclo a 20 MHz y fuga entre pulsos. Esquema analítico (pminflux_sim.mixing, sin simulación) de un ciclo TCSPC de T = 50 ns con K = 4 pulsos cada 12.5 ns. Arriba, el setup medido: decaimiento exponencial τ = 4.21 ns con IRF gaussiana de 0.3 ns FWHM (recuadro) y ventanas [i·12.5, i·12.5 + 10.1] ns. La cola del haz 0 (rayado) cae dentro de la ventana 1: C[1][0] = 0.0467, es decir un 4.7 % de los fotones del haz 0 se cuentan como del haz 1 (C[i][i] = 0.9092). Abajo, el supuesto de los estudios legados (Tlife = 0.001 ns, b = 12.5 ns): los pulsos son instantáneos y la fuga es nula. Si se simula así, el estudio no puede ver el desajuste del estimador sin fuga (el "crimen inverso" F104+F201). C sin IRF, igual a results/mixing_validation.json:C_no_irf. Fuente: results/mixing_validation.json:C_no_irf (recalculado con pminflux_sim.mixing.mixing_matrix). [src:fig-timeline_20MHz] (Figura y leyenda de R3, Worker 2: se dibujan desde los JSON verificados; la verificación de la figura en sí está pendiente.)
+### Por qué la simulación no lo podía ver
+Los estudios usan Tlife = 0.001 ns y b = dt/K [src:F201]. Con τ = 0.001 ns la cola a 12.5 ns es e−12500: fuga nula. Con b = T/K las ventanas cubren el ciclo y el fondo cae 1/K en cada una. En ese régimen los datos simulados siguen exactamente la Ec. 3.5 (la autora lo verificó empíricamente y es exacto: F290-D4) [src:claim-D4]. Es decir, se generan los datos con el mismo modelo que después se invierte: el MLE alcanza el CRB por construcción y “honesto ≈ CRB” no dice nada sobre el experimento real.
+Crimen inverso: los estudios simulan con el mismo modelo directo que usa el estimador (sin fuga entre pulsos y con ventanas que cubren el ciclo: Tlife = 0.001 ns, b = dt/K). En ese régimen la Ec. 3.5 es exacta y el MLE alcanza el CRB, así que la simulación no puede detectar el desajuste de modelo que aparece con τ = 4.21 ns y la ventana [0, 10.1] ns medidos (F104). F201 es la otra mitad: el mismo supuesto aplicado a los estudios.
+### Las dos mitades del mismo error
+F104 (conceptual): el estimador. En el setup medido, SBR 21 e IRF 0, el sesgo asintótico (sin ruido) del MLE de la Ec. 3.5 y los CRB son [src:cmp-cases]:
+ | posición (nm) | sesgo legado (nm) | CRB crb_minflux (nm) | sesgo / CRB | CRB con fuga (nm) | CRB fuga / crb_minflux
+ | (5, -5) | 0.85 | 0.816 | 1.04 | 0.926 | 1.135
+ | (-5.07, -7.56) | 1.51 | 0.849 | 1.78 | 0.922 | 1.086
+ | (20, 0) | 1.63 | 1.004 | 1.62 | 1.117 | 1.113
+ | (-15, 15) | 2.69 | 1.010 | 2.67 | 1.097 | 1.086
+ | (0, -30) | 2.36 | 1.222 | 1.93 | 1.387 | 1.135
+El sesgo es sistemático: no baja con más fotones, así que en unidades de CRB crece como √N. El CRB que usa el legado subestima el real (cociente de la última columna) [src:claim-crbratio].
+F201 (diseño): los estudios. Ideal honesto, C0 → C3: |b| 0.06–0.11 → 2.96–2.98 nm; RMSE/CRB 1.07 → 2.73–2.75 contra el CRB sin fuga (0.864 nm) que usa el estudio, o ≈2.5 contra el CRB de un estimador que conoce la fuga (0.945 nm). Se reproduce exactamente con la semilla 20260825 y dentro del ruido con la 777. Realista honesta: |b| 0.13–0.18 → 1.88–1.94 nm. Realista ingenua: 5.4–5.5 → 10.2–10.9 nm (RMSE 13.0 → 24–25 nm). El sesgo asintótico independiente (sin MC) en el ideal C3 es (−1.02, −2.67) nm, |b| = 2.85, y coincide con el MC a 0.1–0.2 nm en los casos honestos. Descomposición: ventana sola 0.30 nm, fuga sola 3.03 nm (domina la fuga). Eficiencia (ideal, SBR 9): RMSE/CRB 0.97 → 1.19 con N = 100 y 0.98 → 1.53 con N = 1600. El supuesto τ ≈ 0 no está declarado en el .docx ni en los scripts, así que la conclusión 'el honesto alcanza el CRB' vale sin fuga pero no para el experimento a 20 MHz. [src:F201]
+[IMG alt=F201: los estudios apagan la fuga]
+F201: los estudios apagan la fuga. Pipeline legado (sim_exp + nMINFLUX + pos_MINFLUX; Ns 2000, Nb 95, emisor en el píxel (−5, −8), 1000 muestras) con los parámetros de los estudios (Tlife = 0.001 ns, b = 12.5 ns; celeste) y con los del experimento (τ = 4.21 ns, ventanas [0, 10.1] ns; rojo rayado), para cada EBP × estimador (honesto = modelo correcto del EBP; ingenuo = geometría ideal). Ideal honesto: |sesgo| 0.11 → 2.98 nm; RMSE/CRB 1.07 → 2.75 contra el CRB sin fuga (0.864 nm) que usa el estudio (cociente RMSE/CRB calculado aquí de las claves rmse y crb), o ≈2.5 contra el CRB con fuga (0.945 nm, rombo). Realista ingenua: 5.5 → 10.8 nm. Escalas logarítmicas; ±SE de Monte Carlo en el sesgo. Conclusión: la conclusión "el honesto alcanza el CRB" vale sin fuga, no en el experimento a 20 MHz (clase DISEÑO). Fuente: equipo/2026-09-28_review-pminflux-sim/work/w3/F201_out.json:study_A.*.{C0,C3}.{bias_abs,rmse},study_A.*.crb; results/findings.json:F201.impact (CRB con fuga). [src:fig-f201_leakage] (Figura y leyenda de R3, Worker 2: se dibujan desde los JSON verificados; la verificación de la figura en sí está pendiente.)
+Cómo se evita. El modelo que genera los datos tiene que ser más rico que el que asume el estimador (dominio temporal: τ medido, IRF, ventanas reales, TCSPC, tiempo muerto), y el estimador se valida contra ese modelo. Eso es lo que hace v2: simulate.simulate_counts es el modelo rico, estimate.mle_mixing el estimador, y §8 compara los dos estimadores sobre los mismos datos. Nota de justicia: Tlife = 0.001 y b = dt/K ya están en simulations_example.py de Masullo (setup de 40 MHz), y la autora ya anotó como pendiente “incorporar IRF y lifetime medidos” (ESTADO_Y_PLAN_REALISMO_PSF.md:115-117) [src:F201].
+### 4. Hallazgos por clase
+### Conceptual (1)
+El modelo físico o estadístico está mal aunque el código haga lo que pretende. Es la clase que más importa: no se arregla con un parche.
+ F104 Conceptualcrimen inverso
+### pos_MINFLUX/crb_minflux (Ec. 3.5: fondo 1/K, sin fuga) no describen ventanas b < T/K ni la fuga entre pulsos [src:F104]
+ Dóndelegacy/p-minflux-main/tools/tools_simulations.py:1041 (p de pos_MINFLUX), :649-661 (crb_minflux), comentario 'EXACTAMENTE' :433 (bloque :423-440)
+ ImpactoSetup medido, SBR 21: sesgo 0.85 / 1.51 / 1.63 / 2.69 / 2.36 nm en las 5 posiciones = 1.04–2.67 veces el CRB de crb_minflux (0.82–1.22 nm), o 0.92–2.45 veces el CRB real. El CRB real es 8.6–13.5 % mayor que el de crb_minflux; unos 2.5 puntos de ese cociente vienen de los fotones que caen fuera de las ventanas (√(2095/1993.5) = 1.025). La ventana 0 en (5,−5) tiene 45.8 % de fotones de otros haces. SBR 6: 0.59–2.32 nm. Domina la fuga: con b = 12.5 y fuga el sesgo ya es 1.05–2.78 nm; solo b = 10.1 sin fuga da 0.01–0.48 nm (SBR en ventanas 26.06). Es sistemático: en unidades de CRB crece como √N. En la configuración de los estudios (Tlife = 0.001, b = 12.5) el sesgo es 0, así que no cambia ningún número publicado; el efecto sobre los estudios es F201.
+ Qué estaba bienLa autora verificó empíricamente que el fondo uniforme reproduce la Ec. 3.5 con b = dt/K y sin fuga, y eso es exacto (sesgo 0 en la configuración de los estudios; F290-D4). La Ec. 3.5 es el modelo estándar de la literatura; el problema es usarla fuera de ese régimen.
+ Correcciónp_i' = (Ns sum_j C_ij q_j + Nb b/T) / total, con la matriz de mezcla periodica C y el fondo por ancho de ventana; CRB con ese p' y N en ventanas.
+ En v2tests/test_estimate.py::TestEstimate::test_legacy_mle_bias_matches_F104 (antes); tests/test_estimate.py::TestEstimate::test_mixing_mle_unbiased_at_measured_setup (después); tests/test_simulate.py::TestSimulateMixing::test_low_rate_matches_mixing_window_probs (modelo directo correcto) — los tests v2 de los hallazgos existen y pasan (verificado en R2) [src:claim-v2tests]
+Escenario, autoría, script y correcciones
+ EscenarioTCP beams(K=4, L=100), fwhm 360; setup medido τ = 4.21 ns, ventana [0, 10.1] ns, dt = 50 ns; SBR 21 (2000/95) y 6 (2000/333); posiciones (5,−5), (−5.07,−7.56), (20,0), (−15,15) y (0,−30) nm. Sesgo asintótico (sin ruido) del MLE con el modelo de pos_MINFLUX sobre los conteos esperados exactos de sim_exp+nMINFLUX; la mezcla C se validó contra sim_exp en MIX-VALID.
+ Autoríano verificable. tools_simulations.py (encabezado: Luciano Masullo, Lucía López y Lars Richter) no está en la lista de originales de NOTAS.txt, así que la autora lo modificó, pero sin historial git no se puede atribuir la línea concreta. El modelo es la Ec. 3.5 de la tesis de Masullo (crb_minflux cita la aproximación de Balzarotti et al. S29, l.651). El comentario de l.423-440 que lo declara 'EXACTAMENTE' el modelo es de la autora (indicio: comentario en español; sin git. El verificador A (r01) sostiene que el comentario 'EXACTAMENTE' (l.423-440) y la ruta rápida de 'p_minflux' son de la autora; el comentario propio de la ruta rápida (l.454-457) está en inglés), y es correcto en el régimen en que ella lo verificó.
+ Scriptscripts/findings/F104_naive_model_windows_leakage.py
+ Verificado porverifier-A r01: F104 (CONCEPTUAL, l.1041, 649-661, comentario l.433): en el setup medido (tau=4.21, [0,10.1], SBR 21) el sesgo asintotico del MLE de la Ec. 3.5 es 0.85/1.51/1.63/2.69/2.36 nm en las 5 posiciones = 1.04-2.67 veces el CRB de crb_minflux (0.82-1.22 nm); el CRB real es 8.6-13.5 % mayor; la ventana 0 en (5,-5) tiene 45.8 % de fotones de otros haces; SBR 6: 0.59-2.32 nm; solo b=10.1: 0.01-0.48 nm (SBR en ventanas 26.06); configuracion de los estudios: 0. Matices: domina la fuga (con b=12.5 ya da 1.05-2.78 nm); ~2.5 puntos del cociente de CRB vienen de los fotones fuera de las ventanas; no cambia numeros publicados (Tlife=0.001)
+ Correcciones
+CRB 0.82–1.22 nm (sesgo 1.0–2.7 CRB) → 1.04–2.67 veces el CRB de crb_minflux, o 0.92–2.45 veces el CRB real (verifier-A r01 (r01-verifier-A.md, F104))
+sin matices → domina la fuga (con b = 12.5 ya da 1.05–2.78 nm); ~2.5 puntos del cociente de CRB vienen de los fotones fuera de las ventanas; no cambia números publicados (Tlife = 0.001) (verifier-A r01 (state.json F104) + r02-pi.md)
+46 % de fotones de otros haces; SBR en ventanas 26.1 → 45.8 %; 26.06 (verifier-A r01 (state.json F104))
+'verificado por MC: chi2 p = 0.38 mezcla, chi2 = 2559 ingenuo' → se remite a MIX-VALID (reproducido con otro λ por el verificador A) (r02-pi.md: números de state.json)
+### Implementación (9)
+El código no hace lo que dice. Casi todos son latentes: no tocan la configuración de los estudios, pero muerden en cuanto se cambia un parámetro (a < 0, b > T/K, K ≠ 4, SBR = ∞). Por eso conviene tener tests con el código.
+ F101 Implementación
+### sim_exp: en un ciclo con fotones de ≥2 haces sobrevive el de índice k más alto (un TCSPC real se queda con el más temprano) [src:F101]
+ Dóndelegacy/p-minflux-main/tools/tools_simulations.py:511-527 (np.nonzero recorre por filas y Tmicro[m1] = k1*Texp + Exp se sobrescribe, l.522-527); recorte a 1 fotón por ranura en l.464
+ ImpactoA 0.8/ciclo sim_exp coincide con la regla 'gana el k más alto' (|z| ≤ 1.5) y se aparta de p hasta 47 SE. A 0.0105/ciclo el 0.379 % de los ciclos ocupados tiene ≥2 haces y el sesgo relativo máximo es 0.461 %; por localización de 2000 fotones es ≤0.09–0.10 SE (MIX-STUDY). Latente a las tasas del tracking (1e-3 a 5e-3/ciclo): ≤0.05 SE por localización (MIX-TRACKING).
+ Qué estaba bienEl recorte a 1 fotón por ranura y el muestreo en dos pasos (multinomial por haz + ciclos uniformes) son exactos por factorización (F152); a las tasas de los estudios y del tracking el efecto es despreciable por localización.
+ CorrecciónPor ciclo, quedarse con el fotón de microtiempo MINIMO (primer foton) y aplicar tiempo muerto; o simular a tasa baja y declararlo.
+ En v2tests/test_simulate.py::TestSimulateLegacy::test_highest_overwrite_emulation (antes); tests/test_simulate.py::TestSimulateTCSPC::test_earliest_matches_mixing_predictor (después) — los tests v2 de los hallazgos existen y pasan (verificado en R2) [src:claim-v2tests]
+Escenario, autoría, script y correcciones
+ EscenarioMecanismo: tasa alta, 0.8 fotones/ciclo (verificador A: 60 llamadas, 8e4 fotones). Impacto: tasa de los estudios, 0.0105 fotones/ciclo (M_p = 2e5, Nh = 2100), y tasas del tracking, 1e-3 a 5e-3 fotones/ciclo.
+ Autoríano verificable. tools_simulations.py (encabezado: Luciano Masullo, Lucía López y Lars Richter) no está en la lista de originales de NOTAS.txt, así que la autora lo modificó, pero sin historial git no se puede atribuir la línea concreta. El bucle de sobrescritura (l.521-527, comentarios en inglés) es compatible con el código original; el recorte de l.464 está en la ruta rápida (indicio de la autora, verificador A) y conserva el mismo comportamiento.
+ Scriptscripts/findings/F101_tmicro_overwrite.py
+ Verificado porverifier-A r01: F101 (IMPLEMENTACION, l.522-527/464): en un ciclo con >=2 haces sobrevive el k mas alto; a 0.8/ciclo sim_exp coincide con 'highest' (|z|<=1.5) y se aparta de p hasta 47 SE; a 0.0105: 0.379 % de ciclos con >=2 haces, sesgo relativo maximo 0.461 %
+ Correcciones
+0.38 % de ciclos con ≥2 haces; sesgo relativo máximo 0.46 % → 0.379 % y 0.461 % a 0.0105/ciclo (verifier-A r01 (state.json F101))
+escenario 0.5 fotones/ciclo, 60000 fotones, hasta 25 SE (borrador W2) → 0.8 fotones/ciclo, |z| ≤ 1.5 contra 'highest', hasta 47 SE (números verificados) (verifier-A r01 (state.json F101))
+impacto 'ver W1' → latente a las tasas del tracking (≤0.05 SE por localización) (r02-pi.md Tarea 1 + state.json MIX-TRACKING)
+ F102 Implementación latente
+### Los ceros de los ciclos vacíos en relTime se cuentan en la ventana 0 si la ventana abre antes del pulso (a < 0) [src:F102]
+ Dóndelegacy/p-minflux-main/tools/tools_simulations.py:517 (Tmicro = np.zeros(M_p)), :569 (concatenate), :996 (relTime > ti estricto)
+ ImpactorelTime trae 200095 elementos, 198000 de ellos 0.0 exacto (los ciclos vacíos). Con a = −0.25 ns la ventana 0 cuenta ~198037 fotones y el error medio del MLE es 70 nm (1.25 nm con a = 0). Con a = 0 funciona solo por la desigualdad estricta. Latente: todos los estudios usan a = 0.
+ Qué estaba bienCon a = 0 y la desigualdad estricta el conteo es correcto: los ceros quedan fuera de todas las ventanas.
+ CorrecciónDevolver solo los microtiempos de fotones detectados (sin ceros) o una mascara; validar a,b en nMINFLUX.
+ En v2tests/test_simulate.py::TestSimulateLegacy::test_legacy_counting_zeros_in_window0 (antes y después); tests/test_simulate.py::TestSimulateMixing::test_irf_negative_start_and_wrap (corrección) — los tests v2 de los hallazgos existen y pasan (verificado en R2) [src:claim-v2tests]
+Escenario, autoría, script y correcciones
+ EscenarioTCP beams(K=4, L=100), fwhm 360, emisor (5,−5), Ns = 2000, Nb = 95, M_p = 2e5, Tlife = 0.001, dt = 50, b = 12.5; a = 0 frente a a = −0.25 ns; 20 repeticiones.
+ Autoríano verificable. tools_simulations.py (encabezado: Luciano Masullo, Lucía López y Lars Richter) no está en la lista de originales de NOTAS.txt, así que la autora lo modificó, pero sin historial git no se puede atribuir la línea concreta.
+ Scriptscripts/findings/F102_zeros_in_window0.py
+ Verificado porverifier-A r01: F102 (IMPLEMENTACION latente, l.517/569/996): relTime trae 198000 ceros de 200095; con a=-0.25 la ventana 0 cuenta ~198037 y el error medio del MLE es 70 nm (1.25 nm con a=0); a=0 funciona solo por la desigualdad estricta
+ Correcciones
+error medio 1.28 nm (a = 0) y 69.9 nm (a = −0.25) → 1.25 nm y 70 nm (verifier-A r01 (state.json F102))
+'el MLE termina en el borde en el 100 %, estimación media (74.4,−4.2) nm' → se omite: no figura en el texto verificado (r02-pi.md: números de state.json)
+ F103 Implementación latente
+### nMINFLUX no pliega las ventanas módulo el período ni controla el solapamiento [src:F103]
+ Dóndelegacy/p-minflux-main/tools/tools_simulations.py:993-997
+ ImpactoS2: se cuenta dos veces el 10.9 % (τ = 4.21 ns) / 94.9 % (τ = 0.001 ns) de los fotones, sin aviso. S1: la ventana 0 pierde el tramo [49.5, 50) ns; la pérdida esperada es 6.84 % (τ = 4.21) / 2.54 % (τ = 0.001) de sus cuentas. Con τ = 4.21 la estimación asintótica se desplaza 0.338 nm respecto de ventanas periódicas. Es un desplazamiento, no un sesgo que se suma: con τ = 4.21 el sesgo total con las ventanas del legado (0.88 nm) es menor que con ventanas periódicas (1.18 nm), porque el recorte compensa en parte la fuga; con τ = 0.001 sí suma 0.063 nm. Latente: los estudios usan a = 0 y b = dt/K.
+ Qué estaba bienCon a = 0 y b ≤ dt/K, que es lo que usan todos los estudios, las ventanas son correctas.
+ CorrecciónVentana i = {t : (t - tau_i - a) mod T in [0, b)}; error si b > T/K.
+ En v2tests/test_simulate.py::TestSimulateLegacy::test_legacy_counting_non_periodic (antes y después); tests/test_simulate.py::TestSimulateMixing::test_irf_negative_start_and_wrap (corrección) — los tests v2 de los hallazgos existen y pasan (verificado en R2) [src:claim-v2tests]
+Corrección del verificador aplicada. La pérdida esperada de la ventana 0 es 6.84 % (τ = 4.21) / 2.54 % (τ = 0.001); el efecto es un desplazamiento, no un sesgo que se suma: 0.88 nm con las ventanas del legado contra 1.18 nm con ventanas periódicas. [src:claim-F103-corr]
+Escenario, autoría, script y correcciones
+ EscenarioS1: ceros filtrados, a = −0.5 ns, b = 12.5 ns, τ = 4.21 y 0.001 ns, TCP, emisor (5,−5), SBR 21. S2: b = 13 ns > dt/K.
+ Autoríano verificable. tools_simulations.py (encabezado: Luciano Masullo, Lucía López y Lars Richter) no está en la lista de originales de NOTAS.txt, así que la autora lo modificó, pero sin historial git no se puede atribuir la línea concreta.
+ Scriptscripts/findings/F103_windows_not_periodic.py
+ Verificado porverifier-A r01: F103 (IMPLEMENTACION latente, l.993-997): nMINFLUX no pliega ventanas ni controla solapamiento; con b=13 cuenta dos veces el 10.9 % (tau=4.21) / 94.9 % (tau=0.001) de los fotones; con a=-0.5 la estimacion asintotica se desplaza 0.338 nm (tau=4.21)
+ Correcciones
+la ventana 0 pierde 5.9 % (τ = 4.21) / 2.8 % (τ = 0.001) → pérdida esperada 6.84 % / 2.54 % (los del borrador eran MC de 30 llamadas) (verifier-A r01 (state.json F103-num, refuted) + inbox.jsonl ronda 2)
+sesgo asintótico extra del MLE 0.34 nm (τ = 4.21) y 0.06 nm (τ = 0.001) → desplazamiento de 0.338 nm; sesgo total 0.88 nm (legado) contra 1.18 nm (periódico) con τ = 4.21; con τ = 0.001 suma 0.063 nm (verifier-A r01 (state.json F103-num, refuted) + inbox.jsonl ronda 2)
+fotones contados dos veces: 11.2 % (τ = 4.21) → 10.9 % (verifier-A r01 (state.json F103))
+'fondo 0.24 vs 0.25 del ciclo' → se omite: no figura en el texto verificado (r02-pi.md: números de state.json)
+ F107 Implementación latente
+### sim_exp('p_minflux') ignora t_mask (parpadeo) en silencio [src:F107]
+ Dóndelegacy/p-minflux-main/tools/tools_simulations.py:454-466 (_photons_ready = True en la ruta rápida), :473-491 (la máscara solo se aplica en la otra ruta)
+ Impactop_minflux pone el 51.35 % de los fotones en la mitad apagada: la máscara no tiene efecto. Latente: todos los estudios pasan t_mask = None.
+ Qué estaba bienLa ruta rápida es estadísticamente equivalente al multinomial original (exacta por factorización, F152) y ~100 veces más rápida; el comentario de l.473 ('only for cw_minflux / non-fast path') deja a la vista que la máscara solo se aplica en la otra ruta.
+ CorrecciónAplicar la mascara en la ruta rapida (muestrear ciclos con probabilidad proporcional a t_mask) o lanzar error si t_mask no es None.
+ En v2tests/test_simulate.py::TestSimulateBlinking::test_t_mask_blinking_F107 — portado en R3 (Worker 1): simulate_counts(..., t_mask=...). pendiente de verificación
+Escenario, autoría, script y correcciones
+ Escenariot_mask = 0 en la primera mitad de M_p = 2e5 ciclos, Ns = 2000, Nb = 0.
+ Autoríaautora. indicio: comentario en español; sin git. El verificador A (r01) sostiene que el comentario 'EXACTAMENTE' (l.423-440) y la ruta rápida de 'p_minflux' son de la autora; el comentario propio de la ruta rápida (l.454-457) está en inglés.
+ Scriptscripts/findings/F107_tmask_ignored_p_minflux.py
+ Verificado porverifier-A r01: F107 (IMPLEMENTACION latente, l.454-466/473-491): sim_exp('p_minflux') ignora t_mask; 51.35 % de los fotones en la mitad apagada. Autoria a confirmar
+ Correcciones
+51.4 % → 51.35 % (verifier-A r01 (state.json F107))
+'cw_minflux con la misma máscara: 0' → se omite: la rama cw quedó sin verificar (F154 unclear) (verifier-A r01 (state.json F154))
+autoría 'la autora (refactor), a confirmar' → 'autora' con base 'indicio: comentario en español; sin git' (r02-pi.md defaults)
+ F108 Implementación latente
+### cov_ellipse ordena mal los autovectores y no usa el nivel de confianza [src:F108]
+ Dóndelegacy/p-minflux-main/tools/tools_simulations.py:80-90
+ ImpactoUsa vec[order] en lugar de vec[:, order]: el eje mayor sale con un error de −90, −90, −30, +30 y −90° (leído con la convención de matplotlib Ellipse), que no es un cambio de convención constante. Los ejes salen siempre 2 y 6, sin r2. No se usa en ningún script: latente.
+ Qué estaba bienLos ingredientes son los correctos (autovalores de la covarianza y chi2.ppf para r2), y el propio código dejó un TODO sobre r2. La función no se usa en ningún script, así que no afectó ningún resultado.
+ Correcciónvec = vec[:, order] con orden descendente, theta = degrees(arctan2(vec[1,0], vec[0,0])), ejes 2*sqrt(r2*val).
+ En v2tests/test_estimate.py::TestEstimate::test_cov_ellipse_orientation — los tests v2 de los hallazgos existen y pasan (verificado en R2) [src:claim-v2tests]
+Escenario, autoría, script y correcciones
+ EscenarioCovarianza con desvíos 3 y 1 nm y eje mayor a φ = 0, 30, 60, 120 y 150°; nsig = 1 y 2.
+ Autoríano verificable. tools_simulations.py (encabezado: Luciano Masullo, Lucía López y Lars Richter) no está en la lista de originales de NOTAS.txt, así que la autora lo modificó, pero sin historial git no se puede atribuir la línea concreta. El TODO sobre r2 (l.87) ya marcaba la parte del nivel de confianza como pendiente.
+ Scriptscripts/findings/F108_cov_ellipse.py
+ Verificado porverifier-A r01: F108 (IMPLEMENTACION latente, l.80-90): cov_ellipse usa vec[order] en lugar de vec[:,order]; error del eje mayor -90/-90/-30/+30/-90 grados (convencion matplotlib Ellipse); ejes siempre 2 y 6, sin r2
+ Correcciones
+ejes correctos 3.03/9.09 y 4.97/14.92 → se omiten: no figuran en el texto verificado (r02-pi.md: números de state.json)
+ F109 Implementación latente
+### psf(): la rama gaussiana ignora donut_fwhm, la rama SW da NameError y fov_center desplaza x con el signo opuesto a y [src:F109]
+ Dóndelegacy/p-minflux-main/tools/tools_simulations.py:181-199
+ ImpactoLa FWHM gaussiana medida es 361 px cuando se piden 250; la rama SW da NameError; con fov_center (20,20) el cero de una dona en (0,0) cae en el índice (120,120): x se desplaza con el signo opuesto a y. Latente: todos los usos son d='donut' con fov_center = [0,0].
+ Qué estaba bienLa rama 'donut' con fov_center = [0,0], que es la única que se usa, es consistente con indexToSpace (F153) y respeta donut_fwhm.
+ CorrecciónPasar el fwhm a gaussian(); quitar la rama SW; x = arange(-size/2 + c_x, ...), y analogo.
+ En v2tests/test_estimate.py::TestPSF::test_fwhm_honored_and_any_K; tests/test_estimate.py::TestPSF::test_matches_legacy_beams_and_doughnut — los tests v2 de los hallazgos existen y pasan (verificado en R2) [src:claim-v2tests]
+Escenario, autoría, script y correcciones
+ Escenariopsf(d='gaussian', donut_fwhm=250); psf(d='sw'); dona en (0,0) con fov_center = (20,20).
+ Autoríano verificable. tools_simulations.py (encabezado: Luciano Masullo, Lucía López y Lars Richter) no está en la lista de originales de NOTAS.txt, así que la autora lo modificó, pero sin historial git no se puede atribuir la línea concreta.
+ Scriptscripts/findings/F109_psf_helper.py
+ Verificado porverifier-A r01: F109 (IMPLEMENTACION latente, l.181-199): la rama gaussiana ignora donut_fwhm (FWHM 361 cuando se piden 250); la rama SW da NameError; fov_center desplaza x con el signo opuesto a y (cero de (0,0) en el indice (120,120) con fov_center (20,20))
+ Correcciones
+FWHM 361 nm; centro real (−20.5, 20.5) → 361 px; cero de (0,0) en el índice (120,120) (verifier-A r01 (state.json F109))
+autoría 'donut_fwhm lo agregó la autora; SW y fov_center: original, a confirmar' → no verificable (r02-pi.md defaults + verifier-A r01 (autoría unclear))
+ F110 Implementación latente
+### SBR = inf (sin fondo) da NaN: pos_MINFLUX devuelve la esquina del FOV y crb_minflux NaN, sin aviso [src:F110]
+ Dóndelegacy/p-minflux-main/tools/tools_simulations.py:1041, :1050, :649-653
+ ImpactoCon SBR = inf pos_MINFLUX devuelve (−100, 100) y crb_minflux es NaN en toda la grilla; con SBR = 1e12 la estimación es (5,−5). Latente.
+ Qué estaba bienCon cualquier SBR finito, incluso 1e12, pos_MINFLUX y crb_minflux funcionan; SBR/(SBR+1) es la parametrización estándar, y el reemplazo NaN → −inf para los bordes con normPSF = 0 es correcto (D-vi).
+ Correccións = 1 si SBR es inf (o parametrizar por s = Ns/(Ns+Nb)).
+ En v2tests/test_estimate.py::TestEstimate::test_sbr_inf — los tests v2 de los hallazgos existen y pasan (verificado en R2) [src:claim-v2tests]
+Escenario, autoría, script y correcciones
+ EscenarioTCP ideal, grilla 200/1 nm, emisor (5,−5), cuentas esperadas 1000·p, SBR = inf frente a SBR = 1e12.
+ Autoríano verificable. tools_simulations.py (encabezado: Luciano Masullo, Lucía López y Lars Richter) no está en la lista de originales de NOTAS.txt, así que la autora lo modificó, pero sin historial git no se puede atribuir la línea concreta.
+ Scriptscripts/findings/F110_sbr_infinite.py
+ Verificado porverifier-A r01: F110 (IMPLEMENTACION latente, l.1041/1050/649-653): con SBR=inf, pos_MINFLUX devuelve (-100,100) y crb_minflux es NaN en toda la grilla; con 1e12 da (5,-5)
+ Correcciones
+'CRB 1.05 nm con SBR = 1e12' → se omite: no figura en el texto verificado (r02-pi.md: números de state.json)
+autoría 'Masullo (expresión original)' → no verificable (r02-pi.md defaults + verifier-A r01 (autoría unclear))
+ F111 Implementación latente
+### ebp_centres falla para K ≠ 4: L = [L, L, L, L] tiene largo fijo [src:F111]
+ Dóndelegacy/p-minflux-main/tools/tools_simulations.py:266
+ ImpactoK = 5 y K = 7 dan IndexError (con center True y False). Con K = 4 coincide con beams(). Latente: los estudios actuales usan ebp.py.
+ Qué estaba bienCon K = 4 la geometría coincide con beams(). Los comentarios de paridad son correctos: en la rama sin centro literalmente, y en la rama con centro si se leen para Kθ = K − 1 haces periféricos. La autora centralizó la geometría en ebp.py.
+ CorrecciónL = np.full(K, L); un solo generador de geometría (ebp.py / psf.beam_positions).
+ En v2tests/test_estimate.py::TestPSF::test_fwhm_honored_and_any_K — los tests v2 de los hallazgos existen y pasan (verificado en R2) [src:claim-v2tests]
+Corrección del verificador aplicada. No hay “paridad invertida”: los comentarios de paridad son correctos (en la rama con centro, leídos para Kθ = K − 1). [src:claim-F111-corr]
+Escenario, autoría, script y correcciones
+ Escenarioebp_centres(K, 100, center) con K = 4, 5 y 7, center True y False.
+ AutoríaMasullo-original. docstring '[Lars] This is the new version of the old beams() function' (l.250): L. Richter, coautor del código original según el encabezado de tools_simulations.py; sostenido por el verificador A (r01); sin git
+ Scriptscripts/findings/F111_ebp_centres_K.py
+ Verificado porverifier-A r01: F111 (IMPLEMENTACION latente, l.266): ebp_centres da IndexError con K=5 y K=7 (center True y False); con K=4 coincide con beams()
+ Correcciones
+título: '... y los comentarios de paridad están invertidos' → se quita la afirmación de paridad; queda solo el IndexError con K = 5 y K = 7 (verifier-A r01 (state.json F111-comentarios, refuted) + inbox.jsonl ronda 2)
+fix: '...; corregir comentarios; ...' → se quita 'corregir comentarios' (verifier-A r01 (state.json F111-comentarios, refuted))
+ubicación ':266, :273-289' → :266 (verifier-A r01 (state.json F111))
+'ángulos 120/240/0 frente a ebp.ideal_positions 210/330/90' → se omite: no figura en el texto verificado (r02-pi.md: números de state.json)
+ F205 Implementación
+### El sesgo se mide contra R0_NM = (−5.07, −7.56) pero el emisor se simula en el píxel (−5, −8): el desplazamiento de 0.4455 nm aparece como sesgo espurio (|b| 0.43 contra 0.02 nm) y además invierte el orden honesto/ingenuo [src:F205]
+ Dóndelegacy/p-minflux-main/simulation_misalignment.py:67,177,230,256; legacy/p-minflux-main/analyze_realistic_psf.py:36-37,87-88,145-146; núcleo: sim_exp lee psf[:, r0[0], r0[1]] (F106)
+ ImpactoR0_NM = (−5.07, −7.56) se simula en el píxel (−5, −8), un desplazamiento de 0.4455 nm. El |b| honesto ideal es 0.43 nm contra R0 y 0.02 contra el píxel; con 1000 muestras el SE de |b| es ≈0.04, así que el artefacto está a ~10σ. La geométrica ingenua da 0.31 contra R0 y 0.67 contra el píxel: el orden honesto/ingenuo se invierte según la referencia. La diferencia vectorial (−0.35, 0.56) nm no depende de la referencia. Impacto extra: el RMSE de la escalera también se calcula contra R0 (analyze_realistic_psf.py:88). En el ideal el RMSE correcto, contra el píxel realmente simulado (−5, −8), es 0.912 nm; los 0.960 nm que produce el script legado están inflados por el desplazamiento de 0.4455 nm. run_final.log (r0 = (5,−5), entero) no está afectado.
+ Qué estaba bienElla corrigió spaceToIndex para que redondee en lugar de truncar (F153) y usa el mismo r0 y la misma grilla en todos los casos, así que las diferencias vectoriales entre casos son correctas.
+ CorrecciónUsar como verdad grid.to_space(r0_idx) (o simular el emisor con λ interpolado en r0 exacto, lo que corrige el núcleo en R2); reportar sesgos como vectores o diferencias pareadas entre casos.
+ En v2tests/test_estimate.py::TestEstimate::test_continuous_offgrid_no_quantization; tests/test_usability.py::TestStudyV2::test_study_v2_json — los tests v2 de los hallazgos existen y pasan (verificado en R2) [src:claim-v2tests] En R3 el estudio de desalineación se rehízo con v2 (results/study_v2.json, §8), pendiente de verificación.
+Corrección del verificador aplicada. 0.912 nm es el RMSE correcto (contra el píxel realmente simulado, (−5, −8)); 0.960 nm es lo que produce el script legado, inflado por el desplazamiento de 0.4455 nm. [src:claim-F205-corr]
+Escenario, autoría, script y correcciones
+ EscenarioCasos honestos e ingenuos con N = 2095 y 1e5 muestras (multinomial, equivalente a sim_exp en C0); sesgo medido contra R0_NM y contra el píxel realmente simulado.
+ Autoríaautora. declaración de la autora en NOTAS.txt (sin historial git): NOTAS.txt nombra como originales de L. Masullo solo tools/tools_analysis.py y simulations_example.py; este archivo no está en esa lista (atribución por exclusión). Ella cambió R0_NM a la localización experimental no entera (simulation_misalignment.py:67, analyze_realistic_psf.py:36-37); el redondeo a la grilla del núcleo es F106 (no verificable).
+ Scriptscripts/findings/F205_emitter_snapped_to_pixel.py
+ Verificado porverifier-B r01: F205: R0_NM=(-5.07,-7.56) se simula en el píxel (-5,-8) (desplazamiento 0.4455 nm); el |b| honesto ideal es 0.43 contra R0 y 0.02 contra el píxel (1e5 muestras); la geométrica ingenua es 0.31 contra R0 y 0.67 contra el píxel, así que el orden honesto/ingenuo se invierte; la diferencia vectorial (-0.35,0.56) no depende de la referencia. Impacto extra: el RMSE de la escalera también se calcula contra R0 (analyze_realistic_psf.py:88) y pasa de 0.912 a 0.960 nm en el ideal
+ Correcciones
+sin el impacto en el RMSE → impacto extra: RMSE de la escalera 0.912 → 0.960 nm (analyze_realistic_psf.py:88) (verifier-B r01 (state.json F205) + inbox.jsonl ronda 2)
+'pasa de 0.912 a 0.960 nm en el ideal' → 0.912 nm es el RMSE correcto (contra el píxel simulado (−5, −8)); 0.960 nm es lo que produce el script legado, inflado por el desplazamiento de 0.4455 nm (r02-verifier.md (F205, sentido resuelto) + r03-pi.md)
+|b| 0.437 / 0.012 (ideal), 0.302 / 0.663 (geom ingenua); título '0.445 nm' → 0.43 / 0.02 y 0.31 / 0.67; 0.4455 nm (verifier-B r01 (state.json F205))
+'los honest_bias_nm de comparison_metrics.csv (0.434 … 0.519) son casi enteramente este artefacto' → se omite: no figura en el texto verificado (r02-pi.md: números de state.json)
+### Diseño (6)
+Decisiones defendibles que limitan la validez de los estudios: supuestos no declarados, referencias, métricas y reproducibilidad.
+ F106 Diseño
+### Emisor y MLE atados a la grilla de la PSF: el emisor se ajusta al nodo y el argmax discreto cuantiza [src:F106]
+ Dóndelegacy/p-minflux-main/tools/tools_simulations.py:444 (λ = psf[i, r0[0], r0[1]]), :93-106 (spaceToIndex), :1099 (argmax)
+ ImpactoEl emisor pedido en (−5.07,−7.56) se simula en el nodo (−5,−8). En el nodo hay supereficiencia artificial: con N = 104750 el RMSE es 0 (todas las estimaciones caen exactas en el nodo) con un CRB de 0.115 nm. Fuera del nodo la cuantización da RMSE/CRB ~3.3–3.4 con un sesgo de redondeo de ~(−0.25, 0.25) nm.
+ Qué estaba bienspaceToIndex redondea al píxel más cercano en lugar de truncar (corrección verificada en F153) y la autora documentó el término de cuantización px²/12 (curva √(CRB² + px²/12) de su figura de eficiencia).
+ CorrecciónEmisor continuo (lambda evaluado analiticamente o interpolado) y MLE continuo (grilla gruesa + refinamiento); sesgo siempre contra la posicion realmente simulada.
+ En v2tests/test_estimate.py::TestEstimate::test_continuous_offgrid_no_quantization — los tests v2 de los hallazgos existen y pasan (verificado en R2) [src:claim-v2tests]
+Escenario, autoría, script y correcciones
+ EscenarioTCP ideal, fwhm 360, grilla 200 nm / 1 nm, SBR 21. (a) Emisor pedido en (−5.07,−7.56). (b) N = 2095 / 20950 / 104750, emisor en el nodo (5,−5) y fuera del nodo.
+ Autoríano verificable. tools_simulations.py (encabezado: Luciano Masullo, Lucía López y Lars Richter) no está en la lista de originales de NOTAS.txt, así que la autora lo modificó, pero sin historial git no se puede atribuir la línea concreta. El diseño de grilla (λ leído en el nodo, argmax discreto) es compatible con el código original; el redondeo de spaceToIndex (comentario en español, l.100-105) es una corrección posterior.
+ Scriptscripts/findings/F106_grid_emitter_and_mle.py
+ Verificado porverifier-A r01: F106 (DISENO, l.444/93-106/1099): el emisor (-5.07,-7.56) se simula en el nodo (-5,-8); supereficiencia en el nodo (RMSE=0 con N=104750, CRB 0.115 nm); cuantizacion fuera del nodo RMSE/CRB ~3.3-3.4 con sesgo de redondeo ~(-0.25,0.25) nm
+ Correcciones
+fuera de nodo RMSE/CRB 3.40, sesgo de redondeo (−0.22, 0.25) nm → ~3.3–3.4 y ~(−0.25, 0.25) nm (verifier-A r01 (state.json F106))
+ F201 Diseñocrimen inverso
+### Los estudios apagan la fuga entre pulsos (Tlife = 0.001 ns, a = 0, b = dt/K): con τ = 4.21 ns y la ventana [0, 10.1] ns el ideal honesto pasa de |b| ≈ 0.1 nm a ≈ 3 nm y de RMSE/CRB 1.07 a ≈2.5 (contra el CRB con fuga) [src:F201]
+ Dóndelegacy/p-minflux-main/simulation_misalignment.py:55,99-100; legacy/p-minflux-main/documento/make_fig_eficiencia.py:40,76-77; legacy/p-minflux-main/simulations_example.py:51,134-136 (Masullo, dt = 25, l.47)
+ ImpactoIdeal honesto, C0 → C3: |b| 0.06–0.11 → 2.96–2.98 nm; RMSE/CRB 1.07 → 2.73–2.75 contra el CRB sin fuga (0.864 nm) que usa el estudio, o ≈2.5 contra el CRB de un estimador que conoce la fuga (0.945 nm). Se reproduce exactamente con la semilla 20260825 y dentro del ruido con la 777. Realista honesta: |b| 0.13–0.18 → 1.88–1.94 nm. Realista ingenua: 5.4–5.5 → 10.2–10.9 nm (RMSE 13.0 → 24–25 nm). El sesgo asintótico independiente (sin MC) en el ideal C3 es (−1.02, −2.67) nm, |b| = 2.85, y coincide con el MC a 0.1–0.2 nm en los casos honestos. Descomposición: ventana sola 0.30 nm, fuga sola 3.03 nm (domina la fuga). Eficiencia (ideal, SBR 9): RMSE/CRB 0.97 → 1.19 con N = 100 y 0.98 → 1.53 con N = 1600. El supuesto τ ≈ 0 no está declarado en el .docx ni en los scripts, así que la conclusión 'el honesto alcanza el CRB' vale sin fuga pero no para el experimento a 20 MHz.
+ Qué estaba biensim_exp sí modela la fuga con el pliegue periódico (% dt), que para los conteos equivale a la matriz de mezcla (C_ii = 0.909 y 0.047 del haz anterior con τ = 4.21 y [0, 10.1]). Con Tlife = 0.001 y b = dt/K el fondo reproduce exactamente la Ec. 3.5 (ella lo verificó; F290-D4 lo confirma). La separación honesto/ingenuo e ideal/geom/exp es un buen diseño y la comparación es justa (F290-D7). Ella ya anotó como extensión pendiente 'incorporar drift, blinking, IRF y lifetime medidos' (ESTADO_Y_PLAN_REALISMO_PSF.md:115-117).
+ CorrecciónEn los estudios, usar el τ medido (4.21 ns) y las ventanas del experimento ([0, 10.1] ns). En el estimador, la verosimilitud con matriz de mezcla C_ij y fondo b/T por ventana (hallazgo del núcleo F104 de W2; simulador y estimador nuevos en R2). Si se quiere una idealización sin fuga, declararla y rotular las conclusiones como 'sin fuga'.
+ En v2tests/test_simulate.py::TestSimulateLegacy::test_short_lifetime_turns_off_leakage; tests/test_usability.py::TestStudyV2::test_study_v2_json — los tests v2 de los hallazgos existen y pasan (verificado en R2) [src:claim-v2tests] En R3 el estudio de desalineación se rehízo con v2 (results/study_v2.json, §8), pendiente de verificación.
+Corrección del verificador aplicada. El cociente RMSE/CRB ≈ 2.5 es contra el CRB con fuga (0.945 nm); 2.73–2.75 es contra el CRB sin fuga (0.864 nm) que usa el estudio. [src:claim-F201-corr]
+Escenario, autoría, script y correcciones
+ EscenarioPipeline legado sim_exp + nMINFLUX + pos_MINFLUX, corrido como lo corre la autora (Ns = 2000, Nb = 95, r0 = (−5.07,−7.56) nm, que se simula en el píxel (−5,−8), 1000 muestras, R = 0.75·L_eff). Solo cambian (Tlife, b): C0 = (0.001, 12.5), C1 = (0.001, 10.1), C2 = (4.21, 12.5), C3 = (4.21, 10.1). Semillas 20260825 (la del worker) y 777 (verificador B).
+ Autoríaautora. declaración de la autora en NOTAS.txt (sin historial git): NOTAS.txt nombra como originales de L. Masullo solo tools/tools_analysis.py y simulations_example.py; este archivo no está en esa lista (atribución por exclusión). El defecto viene de Masullo: Tlife = 0.001 ya está en simulations_example.py:51 y b = dt/K en :134-136 (setup de 40 MHz, dt = 25), archivo que NOTAS.txt declara original de L. Masullo; la autora lo mantuvo en sus estudios a 20 MHz.
+ Scriptscripts/findings/F201_leakage_off_in_studies.py
+ Verificado porverifier-B r01: F201: con el pipeline legado (sim_exp+nMINFLUX+pos_MINFLUX, Ns=2000, Nb=95, emisor en el píxel (-5,-8), R=0.75·L_eff, 1000 muestras), pasar de (Tlife=0.001, b=12.5) a (τ=4.21 ns, [0,10.1] ns) lleva el ideal honesto de |b| 0.06–0.11 a 2.96–2.98 nm y RMSE/CRB(sin fuga, 0.864) de 1.07 a 2.73–2.75; se reproduce exactamente con la semilla 20260825 y dentro del ruido con la semilla 777; realista honesta 0.13–0.18 -> 1.88–1.94 nm; realista ingenua 5.4–5.5 -> 10.2–10.9 nm (RMSE 13.0 -> 24–25) || F201: el sesgo asintótico independiente (C propia: C_ii=0.9092, del haz anterior 0.0467; conteos esperados; argmax subpíxel) da (-1.02,-2.67) nm, |b|=2.85, en el ideal C3 y coincide con el MC a 0.1–0.2 nm en los casos honestos; ventana sola 0.30 nm, fuga sola 3.03 nm (domina la fuga) || F201: barrido de eficiencia (ideal, SBR 9): RMSE/CRB sube con la fuga, 0.97->1.19 con N=100 y 0.98->1.53 con N=1600 (semilla propia); los 1.23/1.65 del worker son compatibles dentro del ruido MC
+ Correcciones
+clase CONCEPTUAL → DISENO (inbox.jsonl ronda 2 (recomendación de verifier-B r01))
+RMSE/CRB 2.75 (CRB 0.864 nm); título '~2.9 nm (3.4 CRB) y RMSE/CRB 2.75' → 2.73–2.75 contra el CRB sin fuga (0.864 nm); ≈2.5 contra el CRB con fuga (0.945 nm) (verifier-B r01 (state.json F201 clase, unclear) + inbox.jsonl ronda 2)
+'sin declararlo' (class_note) → 'no declarado en el .docx ni en los scripts' + crédito a ESTADO_Y_PLAN_REALISMO_PSF.md:115-117 (verifier-B r01 + r02-pi.md)
+|b| 0.11 → 2.98; realista honesta 0.18 → 1.94; realista ingenua 5.5 → 10.8, RMSE 13.0 → 24.8 → rangos de las dos semillas: 0.06–0.11 → 2.96–2.98; 0.13–0.18 → 1.88–1.94; 5.4–5.5 → 10.2–10.9, RMSE 13.0 → 24–25 (verifier-B r01 (state.json F201))
+descomposición ≈0.25 / ≈3.1 nm; asintótico (−0.98, −2.75) → 0.30 / 3.03 nm; (−1.02, −2.67), |b| = 2.85 (verifier-B r01 (state.json F201))
+eficiencia N = 100 0.97 → 1.23, N = 1600 1.06 → 1.65 → 0.97 → 1.19 y 0.98 → 1.53 (semilla del verificador; los del worker son compatibles dentro del ruido MC) (verifier-B r01 (state.json F201))
+ F202 Diseño
+### realistic_ebp normaliza cada PSF por su propio máximo y descarta intensity_scale: si el máximo del .npy refleja la potencia del haz, el modelo 'realista' pierde potencias relativas de hasta ×1.379, que en p-MINFLUX fijan p_i [src:F202]
+ Dóndelegacy/p-minflux-main/tools/realistic_ebp.py:100-103 (target = image/scale), 152 (intensity_scale se guarda y no se usa), 181-185 (ebp_realistic), docstring 5-6; legacy/p-minflux-main/analyze_realistic_psf.py:122-140
+ ImpactoBajo ese supuesto, p_señal en el emisor pasa de [0.111, 0.262, 0.314, 0.313] a [0.111, 0.207, 0.342, 0.340]. El CRB casi no cambia (2.348 → 2.333 nm), pero el estimador realista sin potencias sobre datos con potencias queda sesgado 10.6 nm (asintótico 10.60, MC 10.65). Sin depender del supuesto: la etapa 'experimental' de la escalera usa los .npy crudos con su escala y las demás no, así que el salto 9.66 → 35.6 nm mezcla la estructura no modelada con este cambio de normalización. El docstring (realistic_ebp.py:5-6) declara unidades relativas al máximo de cada PSF: el código hace lo que dice, y por eso es DISENO.
+ Qué estaba bienAjuste 2D robusto (soft-L1) con el centro refinado localmente, separación explícita pedestal/fondo Nb, escalera reproducible con semilla (se reproduce al 4.º decimal) y MC rápido equivalente a pos_MINFLUX. Ella misma recomienda 'permitir distinta potencia entre haces' (ESTADO_Y_PLAN_REALISMO_PSF.md:116) y advierte que las elipticidades son 'parámetros efectivos'; el aporte nuevo es cuantificarlo y mostrar que contamina la escalera.
+ CorrecciónReconstruir cada PSF como intensity_scale·(pedestal + A·D_k + gradiente), o ajustar sin normalizar, y validar p_i(r0) del modelo contra las PSF medidas. Reportar las potencias relativas como un parámetro más de la escalera.
+ En v2tests/test_estimate.py::TestEstimate::test_free_powers_removes_bias — los tests v2 de los hallazgos existen y pasan (verificado en R2) [src:claim-v2tests]
+Escenario, autoría, script y correcciones
+ EscenarioEscalera de modelos reconstruida desde fit_parameters.csv (se reproduce comparison_metrics.csv al 4.º decimal con la semilla 20260901). Después, a cada PSF se le aplica su intensity_scale (21.02, 16.65, 22.96, 22.86; máx/mín 1.379). Supuesto explícito: el máximo de cada .npy refleja la potencia relativa del haz (× la eficiencia de detección). Lo apoya que el orden de los máximos se repite en las 3 calibraciones disponibles (20260703: 245/205/291/253; 20260707: 6.4/4.8/6.8/5.3; 20260924: 21.2/18.4/26.6/19.7), pero sigue siendo un supuesto a confirmar con la autora.
+ Autoríaautora. declaración de la autora en NOTAS.txt (sin historial git): NOTAS.txt nombra como originales de L. Masullo solo tools/tools_analysis.py y simulations_example.py; este archivo no está en esa lista (atribución por exclusión).
+ Scriptscripts/findings/F202_realistic_ebp_drops_beam_power.py
+ Verificado porverifier-B r01: F202: realistic_ebp normaliza cada PSF por su máximo y no usa intensity_scale (realistic_ebp.py:100-103,152,181-185); escalas con máx/mín 1.379; p_señal [0.111,0.262,0.314,0.313]->[0.111,0.207,0.342,0.340]; CRB 2.348->2.333 nm; el estimador realista sin potencias sobre datos con potencias queda sesgado 10.6 nm (asintótico 10.60, MC 10.65); la escalera de comparison_metrics.csv se reproduce al 4.º decimal
+ Correcciones
+clase IMPLEMENTACION → DISENO (inbox.jsonl ronda 2 + verifier-B r01 (state.json F202 clase, refuted))
+supuesto 'máximo del .npy = potencia' solo en el reporte del worker → explícito en scenario e impact, con el orden repetido en 3 calibraciones (verifier-B r01 (state.json F202 clase, refuted) + inbox.jsonl ronda 2)
+sin crédito → crédito a ESTADO_Y_PLAN_REALISMO_PSF.md:116 ('permitir distinta potencia entre haces') (verifier-B r01 + inbox.jsonl ronda 2)
+'el estimador de geometría pasa de |b| 5.1 a 8.8 nm' → se omite (el verificador obtuvo 8.5 en MC; no figura en el texto verificado) (verifier-B r01 (r01-verifier-B.md F202))
+ F203 Diseño
+### En los casos ingenuos (y en los honestos con N bajo) el RMSE y el |sesgo| dependen del radio de búsqueda R; no se reporta la fracción de estimaciones en el borde; la tabla mezcla un RMSE por eje con un |sesgo| 2D [src:F203]
+ Dóndelegacy/p-minflux-main/simulation_misalignment.py:75,178,222-232,265-277; legacy/p-minflux-main/documento/make_fig_eficiencia.py:44,89,118-125; legacy/p-minflux-main/analyze_realistic_psf.py:88,147
+ ImpactoRealista ingenua (N = 2095): RMSE 12.1 / 13.2 / 50.0 / 81.9 nm con el 0 / 1 / 50 / 87 % en el borde para R = 0.5 / 0.75 / 1.0 / 1.25·L. Sustituto 20260703 ingenuo: |b| 48 / 72 / 96 / 118 nm ≈ R − |r0|, con el 100 % de las estimaciones en el borde solo para R ≤ 1.0·L (71–72 % con R = 1.25·L). Con el R de la autora (0.75·L) y el EBP realista, el ingenuo tiene solo un 1 % en el borde: 'lo fija R' vale para el sustituto experimental y para R ≥ 1.0·L. Con N = 100 incluso el honesto depende de R (realista 12–26 nm). Métrica: en el log |b| = 62.76 nm > RMSE = 46.96 nm porque el RMSE es por eje y |b| es la norma 2D.
+ Qué estaba bienAcotar la búsqueda es físicamente correcto (MINFLUX estima localmente) y corrigió máximos espurios; el radio sale del tamaño del patrón y es el mismo en todos los casos, así que la comparación es justa (F290-D7).
+ CorrecciónReportar la fracción en el borde y un barrido en R (o usar un prior suave en vez de un corte duro); para los ingenuos, informar el sesgo condicionado a estimaciones interiores o la mediana. Usar una sola convención (RMSE 2D junto a |b| 2D, o todo por eje).
+ En v2tests/test_estimate.py::TestEstimate::test_boundary_fraction_reported — los tests v2 de los hallazgos existen y pasan (verificado en R2) [src:claim-v2tests]
+Corrección del verificador aplicada. El 100 % de estimaciones en el borde vale solo con R ≤ 1.0·L (71–72 % con R = 1.25·L). [src:claim-F203-corr]
+Escenario, autoría, script y correcciones
+ EscenarioCasos 'Realista ingenua' y 'Experimental ingenua' (sustituto medido 20260703, rotulado como tal) variando solo R_SEARCH_FACTOR ∈ {0.5, 0.75, 1.0, 1.25}·L; 1000 muestras; N = 2095 y N = 100 (SBR 9).
+ Autoríaautora. declaración de la autora en NOTAS.txt (sin historial git): NOTAS.txt nombra como originales de L. Masullo solo tools/tools_analysis.py y simulations_example.py; este archivo no está en esa lista (atribución por exclusión). Ella introdujo r_max_nm, que corrige la búsqueda sin cota; lo discutible es cómo se reportan los números.
+ Scriptscripts/findings/F203_naive_rmse_set_by_search_disk.py
+ Verificado porverifier-B r01: F203: el RMSE y el |b| de los ingenuos dependen de R: realista ingenua RMSE 12.1/13.2/50.0/81.9 nm con 0/1/50/87 % en el borde para R=0.5/0.75/1/1.25·L; sustituto 20260703 ingenuo |b| 48/72/96/118 ≈ R−|r0|; el honesto con N=100 también depende de R (realista 12–26 nm); en el log |b|=62.76 > RMSE=46.96 porque el RMSE es por eje
+ Correcciones
+'el 100 % de las estimaciones ingenuas queda en el borde para los cuatro R' → 100 % en el borde solo para R ≤ 1.0·L (71–72 % con 1.25·L); con R = 0.75 y el EBP realista el ingenuo tiene un 1 % en el borde (verifier-B r01 (state.json F203, refuted) + inbox.jsonl ronda 2)
+realista ingenua RMSE 12.1/13.9/51.0/82.1 nm con 0/1.8/52/87 % en el borde → 12.1/13.2/50.0/81.9 nm con 0/1/50/87 % (verifier-B r01 (state.json F203))
+|b| 48/72/96/119; honesto N = 100 11.4–23.4 (realista) y 14.6–41.4 (sustituto) → |b| 48/72/96/118; honesto realista 12–26 nm (verifier-B r01 (state.json F203))
+ F204 Diseño
+### Los errores estándar suponen estimaciones normales (std/√(2n), RMSE/√(2n)): con N = 100 y un EBP con pedestal el SE real de RMSE/CRB es 1.6–1.9 veces el impreso; el |sesgo| no descuenta su piso de ruido [src:F204]
+ Dóndelegacy/p-minflux-main/simulation_misalignment.py:239-241,270-277; legacy/p-minflux-main/documento/make_fig_eficiencia.py:124-131
+ ImpactoSE real / SE impreso de RMSE/CRB = 1.88 (realistic_fit), 1.63 (sustituto 20260703) y 0.77 (ideal, donde el SE impreso es conservador). Exceso de curtosis de las estimaciones: 6.6/4.6 (realista) contra 0.2/0.1 (ideal). Piso de ruido de |b| en el ideal ≈0.36 nm con n = 250. Extrapolación desde EBP sustitutos (no medida con las PSF 20260820, que no están): su '1.89 ± 0.08' pasaría a ± ~0.13–0.15; la conclusión cualitativa se sostiene.
+ Qué estaba bienSemillas fijas y SE reportados en todos los estadísticos, que el código original no tenía; la curva de cuantización √(CRB² + px²/12) de la figura explica bien el ascenso del ideal a N alto.
+ CorrecciónSE por bootstrap (o réplicas con semillas independientes) para std, RMSE y RMSE/CRB; reportar |b| con el piso restado o un test de Hotelling de sesgo = 0; reportar la curtosis o la fracción en el borde junto a la σ.
+ En v2tests/test_estimate.py::TestCompare::test_compare_json_complete (SE bootstrap) — los tests v2 de los hallazgos existen y pasan (verificado en R2) [src:claim-v2tests]
+Corrección del verificador aplicada. El “± ~0.13–0.15” para el 1.89 es una extrapolación desde EBP sustitutos, no una medición con las PSF 20260820. [src:claim-F204-corr]
+Escenario, autoría, script y correcciones
+ EscenarioEl punto N = 100 de make_fig_eficiencia (SBR 9, r0 = (5,−5), 250 muestras) replicado 400 veces con semillas independientes; se compara la dispersión real de cada estadístico con el SE que imprime el script.
+ Autoríaautora. declaración de la autora en NOTAS.txt (sin historial git): NOTAS.txt nombra como originales de L. Masullo solo tools/tools_analysis.py y simulations_example.py; este archivo no está en esa lista (atribución por exclusión). Agregar SE fue una mejora de ella sobre el original, que no tenía incertidumbres.
+ Scriptscripts/findings/F204_standard_errors_gaussian_assumption.py
+ Verificado porverifier-B r01: F204: con N=100 (SBR 9, 250 muestras), SE real/SE impreso de RMSE/CRB = 1.88 (realistic_fit), 1.63 (sustituto 20260703) y 0.77 (ideal); exceso de curtosis 6.6/4.6 (realista) contra 0.2/0.1 (ideal); piso de ruido de |b| en el ideal ≈0.36 nm con n=250. El '±0.13–0.15' para su 1.89 es una extrapolación desde sustitutos
+ Correcciones
+'Su 1.89 ± 0.08 pasa a ± ~0.13–0.15' → rotulado como extrapolación desde EBP sustitutos (verifier-B r01 (state.json F204) + inbox.jsonl ronda 2)
+SE real/impreso 1.86 / 1.55 / 0.74; curtosis 6.8/4.7; piso 0.34 nm → 1.88 / 1.63 / 0.77; 6.6/4.6; ≈0.36 nm (verifier-B r01 (state.json F204))
+'la no monotonía 1.20 (N = 200) / 1.27 (N = 400) queda dentro del ruido' → se omite: el verificador no la comprobó por separado (faltan las PSF reales) (verifier-B r01 (r01-verifier-B.md F204))
+ F206 Diseño
+### La cadena que arma el documento (run_and_save → run_final.log → build_doc) ya no lo reproduce: el script, el log y los parámetros escritos a mano corresponden a configuraciones distintas [src:F206]
+ Dóndelegacy/p-minflux-main/documento/build_doc.py:19,30-41,535-537,812-821; legacy/p-minflux-main/documento/run_and_save.py:57; legacy/p-minflux-main/simulation_misalignment.py:50,57,67,96
+ Impacto5 discrepancias: 1000 muestras (script) contra 300 (log); r0 (−5.07,−7.56) contra (5,−5); Ns/Nb 2000/95 contra 90/10 (el CRB 4.28 nm del log corresponde a N = 100); INCLUDE_REALISTIC_FIT = True sin filas 'Realista' en el log; y CASES incluye 'Experimental ingenua 1/2', que tampoco están en el log. Los parámetros están escritos a mano en build_doc.py:535-537 y 812-821. Si hoy se corre la cadena, el .docx sale con números de una configuración y parámetros de otra.
+ Qué estaba bienEl Tee de stdout a log y la cadena documentada en el encabezado de build_doc son buena práctica de trazabilidad, eficiencia.log es reproducible, y ella ya advierte que los logs vienen de configuraciones distintas y que hay que guardar configuración, semilla y versión junto a cada resultado (ESTADO_Y_PLAN_REALISMO_PSF.md:64-67).
+ CorrecciónQue el script escriba un JSON con la configuración completa (semilla, versión) junto a la tabla, y que build_doc tome de ahí los parámetros (§5 y tabla 9.1) en vez de escribirlos a mano; que falle si no coinciden.
+ En v2tests/test_estimate.py::TestCompare::test_compare_json_complete (todos los parámetros en el JSON) — los tests v2 de los hallazgos existen y pasan (verificado en R2) [src:claim-v2tests]
+Escenario, autoría, script y correcciones
+ EscenarioChequeo estático (ast y regex) de simulation_misalignment.py, run_final.log y build_doc.py.
+ Autoríaautora. declaración de la autora en NOTAS.txt (sin historial git): NOTAS.txt nombra como originales de L. Masullo solo tools/tools_analysis.py y simulations_example.py; este archivo no está en esa lista (atribución por exclusión).
+ Scriptscripts/findings/F206_doc_numbers_vs_scripts.py
+ Verificado porverifier-B r01: F206: la cadena run_and_save -> run_final.log -> build_doc no reproduce el documento: 1000 vs 300 muestras, r0 (-5.07,-7.56) vs (5,-5), Ns/Nb 2000/95 vs 90/10, casos Realista (y 'Experimental ingenua 1/2') ausentes del log, parámetros escritos a mano en build_doc.py:535-537 y 812-821; la autora ya lo advierte en ESTADO…md:64-67
+ Correcciones
+4 discrepancias → 5: se agrega CASES con 'Experimental ingenua 1/2' ausentes del log (verifier-B r01 (state.json F206) + inbox.jsonl ronda 2)
+### 5. Lo que estaba bien
+Una revisión justa tiene que decir también qué resistió la verificación. Esto es lo que estaba bien, con la evidencia:
+sim_exp sí modelaba la fuga: el pliegue periódico (% dt) equivale, para los conteos, a la matriz de mezcla; el error estaba en los parámetros con que se lo llamaba. F201 [src:F201]
+Validó empíricamente que el término de fondo uniforme reproduce la Ec. 3.5 con b = dt/K y sin fuga, y es exacto en ese régimen. F104 [src:F104]
+Ya había anotado como pendiente “incorporar drift, blinking, IRF y lifetime medidos” (ESTADO_Y_PLAN_REALISMO_PSF.md:115-117). F201 [src:F201]
+Ya recomendaba “permitir distinta potencia entre haces” (ESTADO…md:116) y advertía que las elipticidades son parámetros efectivos. F202 [src:F202]
+Ya advertía que los logs vienen de configuraciones distintas y que hay que guardar configuración, semilla y versión con cada resultado (ESTADO…md:64-67). F206 [src:F206]
+Corrigió spaceToIndex para redondear en vez de truncar (el truncado sesgaba (−0.50, +0.50) nm, F153) y documentó el término de cuantización px²/12. F106 [src:F106]
+Acotó la búsqueda del MLE (r_max_nm), que corrige máximos espurios; el radio es el mismo en todos los casos. F203 [src:F203]
+Agregó semillas fijas y errores estándar a todos los estadísticos, que el código original no tenía. F204 [src:F204]
+Ajuste 2D robusto de las PSF con escalera reproducible (se reproduce al 4.º decimal). F202 [src:F202]
+La ruta rápida de sim_exp es estadísticamente equivalente al multinomial original (exacta por factorización) y unas 100 veces más rápida. F107 [src:F107]
+La comparación honesta/ingenua es justa: una semilla antes de todos los casos, el mismo r0, SBR y radio de búsqueda [src:claim-D7].
+crb_minflux coincide con un Fisher continuo independiente dentro de 4.4·10−4 nm (F151); el muestreo en dos pasos y el fondo Nb·b/T por ventana son exactos (F152) [src:discarded].
+### 6. Qué podría haber hecho distinto
+Prácticas concretas que habrían evitado cada hallazgo. Ninguna es exótica; son la diferencia entre “el código corre” y “el estudio responde la pregunta”.
+ | Práctica | Qué quiere decir en este proyecto | Hallazgos
+ | Simular con un modelo directo más rico que el del estimador | Generar los datos en dominio temporal (τ, IRF, ventanas reales, TCSPC de primer fotón, tiempo muerto) y ajustar con el modelo simplificado. Si el estimador alcanza el CRB, que sea sobre datos que no fabricó su propio modelo. | F104, F201
+ | Usar los parámetros medidos del instrumento | τ = 4.21 ns y la ventana [0, 10.1] ns ya estaban medidos en 20260707; ponerlos por defecto en los estudios y declarar cualquier idealización (“sin fuga”) en el título de la tabla. | F201
+ | Validar el estimador contra un modelo que no asume | Un test de consistencia: fracciones por ventana de la simulación contra la predicción del estimador (χ²). Con fuga, la Ec. 3.5 falla ese test por miles de unidades de χ². | F104, §9
+ | Emisor continuo y referencia correcta | Simular el emisor fuera de la grilla y medir el sesgo contra la posición realmente simulada; reportar sesgos como vectores o diferencias pareadas. | F106, F205
+ | Reportar la fracción en el borde y barrer el radio de búsqueda | Cuando una estimación cae en el borde del disco, el RMSE lo fija R, no el estimador. | F203
+ | Errores estándar por bootstrap | Con N bajo y PSF con pedestal las estimaciones no son normales; std/√(2n) subestima el SE hasta ~1.9×. | F204
+ | Un pipeline que genere el documento | El script escribe un JSON con configuración, semilla y versión; el documento lee de ahí y falla si no coincide. Nada de parámetros escritos a mano. | F206
+ | Fijar las versiones de los datos | Registrar el sha256 de las PSF y calibraciones usadas (las 20260820 no están en disco y los números “Experimental” no se pudieron reproducir). | F202, F204, §10
+ | Tests con el código y validaciones de entrada | Los bugs latentes (K ≠ 4, SBR = ∞, a < 0, b > T/K, FWHM gaussiana) los atrapa un test de una línea o un ValueError. | F102, F103, F108–F111
+ | Simular a la tasa del experimento con el TCSPC real | Quedarse con el primer fotón del ciclo y aplicar tiempo muerto; a las tasas del tracking el efecto es chico, pero así se sabe. | F101
+### 7. La versión mejorada
+La versión mejorada vive en src/pminflux_sim. No reemplaza tu código de análisis: reemplaza el núcleo de simulación y estimación y corrige los hallazgos de implementación.
+pminflux_sim.mixing — Matriz de mezcla de fuga entre ventanas para p-MINFLUX pulsado. [src:mod-mixing]
+pminflux_sim.simulate — Simulador p-MINFLUX pulsado en dominio temporal (fotón por fotón, vectorizado por bloques). [src:mod-simulate]
+pminflux_sim.estimate — Estimación de posición p-MINFLUX: MLE continuo con matriz de mezcla, MLE del legado (Ec. 3.5), [src:mod-estimate]
+pminflux_sim.psf — Haces de excitación y geometría del EBP para p-MINFLUX (versión v2). [src:mod-psf]
+pminflux_sim.windows — Conteo de fotones por ventana a partir de microtiempos (reemplazo de ``nMINFLUX`` del legado). [src:mod-windows]
+### Tabla de migración legado → v2
+ | Legado (tools/tools_simulations.py) | v2 | Diferencias
+ | sim_exp(key, t_mask, psf, r0, SBR, Ns, Nb, M_p, Tlife, factor, dt) | simulate.simulate_counts(lam, n_loc, N, sbr, SimParams(...), rng, return_tags, t_mask) | tiempo absoluto con fuga entre ciclos; TCSPC "gana el más temprano" + tiempo muerto (F101); IRF; t_mask sí se aplica (F107); N detectados en lugar de M_p ciclos
+ | nMINFLUX(K, τ, relTime, a, b) | windows.count_windows(microtime_ns, T, K, a, b, macro_index) | ventanas medio abiertas plegadas módulo T (F103); sin ceros artificiales (F102); error con b > T/K
+ | pos_MINFLUX(n, PSF, SBR, px_nm, r_max_nm) | estimate.mle_mixing(counts, pos, fwhm, C, b, T, sbr, bounds_radius) | continuo (sin grilla, F106/F205), con matriz de mezcla C y fondo b/T (F104); informa on_boundary (F203) y converged
+ | (para comparar con el legado) | estimate.mle_legacy(counts, pos, fwhm, sbr, bounds_radius) | la Ec. 3.5 de pos_MINFLUX, continua
+ | crb_minflux(K, PSF, SBR, px_nm, size_nm, N) | estimate.crb(r, pos, fwhm, C, b, T, sbr, N) (y crb_legacy) | con fuga; N del ciclo completo; estorbos free_bg/free_powers; sbr = inf sin NaN (F110)
+ | psf(...), beams(K, L, center, d), ebp_centres(K, L, center, phi) | psf.beam_positions(K, L, center, phi), psf.lambda_beams(r, pos, fwhm, kind) | cualquier K (F111); la fwhm del gaussiano se respeta (F109); gradiente analítico
+ | cov_ellipse(cov, q, nsig) | estimate.cov_ellipse(cov, nsig, q) | autovectores por columnas y factor χ² aplicado (F108)
+ | Tlife = 0.001 (estudios) | SimParams(tau=4.21) | el τ real; con τ ≈ 0 no hay fuga y el estudio no ve el desajuste (F201, "crimen inverso")
+ | dt = 50, b = 12.5 | SimParams(T=50.0, b=10.1) | ventana medida [0, 10.1]
+Convención de parámetros:
+ | Legado | v2
+ | SBR (Ns/Nb) | sbr = Ns/Nb del ciclo completo
+ | Ns, Nb | N = Ns + Nb detectados; sbr = Ns/Nb
+ | Tlife | tau (ns)
+ | dt (período) | T (ns)
+ | a, b (ventana) | a, b (ns), ventana [i·T/K + a, +b) mod T
+ | M_p (ciclos), factor | rate_per_cycle (fotones incidentes por ciclo); la simulación corre hasta N detecciones
+ | px_nm, size_nm, r_max_nm | sin grilla; bounds_radius (nm) = radio del disco de búsqueda
+ | r0 en índices de píxel | r en nm, continuo
+ | PSF normalizadas al máximo | powers / beam_powers = potencias relativas
+Tomadas de la sección de migración de README.md [src:readme]. El README (R3, Worker 1) está pendiente de revisión independiente.
+### Ejemplo mínimoimport numpy as np
+import pminflux_sim as pm
+pos = pm.beam_positions(4, 100.0) # TCP: haz central + 3 en un círculo de L = 100 nm
+C = pm.mixing_matrix(4.21, 50.0, 4, 0.0, 10.1, irf_fwhm=0.3) # C[i, j] = P(fotón del haz j cae en la ventana i)
+r0 = np.array([5.0, -5.0]) # emisor (nm), continuo
+lam = pm.lambda_beams(r0, pos, 360.0) # excitación de cada haz (dona, fwhm 360 nm)
+params = pm.SimParams() # setup medido: tau 4.21, ventana [0, 10.1], IRF 0.3, d = 22, 2.5e-3/ciclo
+counts, tags = pm.simulate_counts(lam, 500, 2095, 2000 / 95., params,
+ rng=np.random.default_rng(1), return_tags=True)
+# con datos reales se parte de los microtiempos (ns) y del id de localización de cada fotón:
+counts = pm.count_windows(tags["microtime_ns"], T=50.0, K=4, a=0.0, b=10.1,
+ macro_index=tags["loc"], n_loc=500)
+est = pm.mle_mixing(counts, pos, 360.0, C, 10.1, 50.0, 2000 / 95., bounds_radius=75.0)
+leg = pm.mle_legacy(counts, pos, 360.0, 2000 / 95., bounds_radius=75.0) # Ec. 3.5, para comparar
+sigma = pm.crb(r0, pos, 360.0, C, 10.1, 50.0, 2000 / 95., 2095) # CRB por eje (nm)
+print(est.r.mean(0) - r0, leg.r.mean(0) - r0, sigma, est.boundary_fraction, est.n_failed)
+Inicio rápido de README.md [src:readme]; el mismo flujo con tabla de resultados está en scripts/example_end_to_end.py.
+### Cómo se usa
+python -m unittest discover -s tests # tests
+python scripts/example_end_to_end.py # ejemplo de punta a punta (setup medido)
+python scripts/validate_mixing_matrix.py # validación de la matriz de mezcla
+python scripts/compare_legacy_vs_v2.py # legado contra v2
+python scripts/study_misalignment_v2.py # estudio de desalineación v2
+python scripts/make_report_figures.py # figuras
+python scripts/build_report.py # este reporte
+### 8. Resultados: legado contra v2
+Mismos datos del simulador v2 (v2sim, τ = 4.21 ns, ventana [0, 10.1] ns, 0.0025 fotones/ciclo, tiempo muerto 22 ns, TCSPC earliest), Ns = 2000, 2000 localizaciones por caso, SE por bootstrap (500 réplicas) [src:cmp-cases]. RMSE/CRB usa el CRB con fuga del estimador de mezcla; el sesgo del legado no baja con N.
+ | IRF (ns) | SBR | posición (nm) | CRB fuga | CRB legado | legado |b| (nm) | legado RMSE/CRB | mezcla |b| (nm) | mezcla RMSE/CRB | mezcla+β libre RMSE/CRB | fracción en el borde (máx)
+ | 0.0 | 21 | (5, -5) | 0.926 | 0.816 | 0.80 ± 0.02 | 1.233 | 0.03 ± 0.02 | 1.000 | 1.003 | 0.000
+ | 0.0 | 21 | (-5.07, -7.56) | 0.922 | 0.849 | 1.42 ± 0.03 | 1.694 | 0.05 ± 0.02 | 1.006 | 1.006 | 0.000
+ | 0.0 | 21 | (20, 0) | 1.117 | 1.004 | 1.59 ± 0.02 | 1.401 | 0.05 ± 0.03 | 1.002 | 1.003 | 0.000
+ | 0.0 | 21 | (-15, 15) | 1.097 | 1.010 | 2.61 ± 0.03 | 2.000 | 0.08 ± 0.03 | 0.993 | 0.988 | 0.000
+ | 0.0 | 21 | (0, -30) | 1.387 | 1.222 | 2.41 ± 0.03 | 1.573 | 0.11 ± 0.04 | 0.985 | 0.982 | 0.000
+ | 0.0 | 6 | (5, -5) | 0.973 | 0.887 | 0.57 ± 0.02 | 1.122 | 0.04 ± 0.02 | 1.013 | 1.019 | 0.000
+ | 0.0 | 6 | (-5.07, -7.56) | 0.971 | 0.909 | 0.74 ± 0.03 | 1.252 | 0.02 ± 0.02 | 1.014 | 1.014 | 0.000
+ | 0.0 | 6 | (20, 0) | 1.179 | 1.070 | 1.58 ± 0.02 | 1.348 | 0.10 ± 0.02 | 1.016 | 1.015 | 0.000
+ | 0.0 | 6 | (-15, 15) | 1.167 | 1.087 | 2.30 ± 0.03 | 1.762 | 0.02 ± 0.02 | 0.995 | 0.994 | 0.000
+ | 0.0 | 6 | (0, -30) | 1.494 | 1.346 | 1.94 ± 0.03 | 1.370 | 0.04 ± 0.03 | 1.009 | 1.019 | 0.000
+ | 0.3 | 21 | (5, -5) | 0.933 | 0.816 | 0.87 ± 0.02 | 1.260 | 0.04 ± 0.02 | 0.999 | 0.995 | 0.000
+ | 0.3 | 21 | (-5.07, -7.56) | 0.928 | 0.849 | 1.49 ± 0.03 | 1.710 | 0.03 ± 0.02 | 0.990 | 0.990 | 0.000
+ | 0.3 | 21 | (20, 0) | 1.126 | 1.004 | 1.64 ± 0.03 | 1.420 | 0.02 ± 0.02 | 1.002 | 0.997 | 0.000
+ | 0.3 | 21 | (-15, 15) | 1.105 | 1.010 | 2.69 ± 0.03 | 2.059 | 0.05 ± 0.03 | 1.022 | 1.016 | 0.000
+ | 0.3 | 21 | (0, -30) | 1.398 | 1.222 | 2.45 ± 0.03 | 1.585 | 0.10 ± 0.04 | 0.998 | 0.993 | 0.000
+ | 0.3 | 6 | (5, -5) | 0.981 | 0.887 | 0.57 ± 0.02 | 1.115 | 0.02 ± 0.02 | 1.004 | 1.005 | 0.000
+ | 0.3 | 6 | (-5.07, -7.56) | 0.978 | 0.909 | 0.67 ± 0.03 | 1.231 | 0.06 ± 0.02 | 1.011 | 1.007 | 0.000
+ | 0.3 | 6 | (20, 0) | 1.189 | 1.070 | 1.66 ± 0.02 | 1.371 | 0.04 ± 0.02 | 1.005 | 1.004 | 0.000
+ | 0.3 | 6 | (-15, 15) | 1.176 | 1.087 | 2.38 ± 0.03 | 1.796 | 0.02 ± 0.02 | 0.997 | 0.999 | 0.000
+ | 0.3 | 6 | (0, -30) | 1.507 | 1.346 | 1.96 ± 0.03 | 1.377 | 0.06 ± 0.03 | 1.012 | 1.003 | 0.000
+Reproducción independiente del verificador: W3-R2 tabla compare_legacy_vs_v2 reproducida en los 20 casos con simulador, MLE y CRB propios y otra semilla: CRB_mezcla y crb_minflux idénticos a 3 decimales; legado |b| 0.556-2.712 nm, RMSE/CRB 1.110-2.052 (peor caso (-15,15) SBR21 IRF0.3: 2.052 vs 2.059); MLE de mezcla RMSE/CRB 0.971-1.033, |b|<=0.10 nm [src:claim-cmp-verif]
+[IMG alt=Estimador legado frente al MLE con matriz de mezcla]
+Estimador legado frente al MLE con matriz de mezcla. |sesgo| (arriba, nm) y RMSE/CRB (abajo) de 2000 localizaciones por caso, con barras de ±SE por bootstrap (500 remuestreos), para el MLE legado de la Ec. 3.5, el MLE con matriz de mezcla y el MLE de mezcla con fondo libre por localización. Datos del simulador v2 (source = v2sim), Ns = 2000, en 5 posiciones (P1 = (5, -5), P2 = (-5.07, -7.56), P3 = (20, 0), P4 = (-15, 15), P5 = (0, -30) nm), SBR 21/6 e IRF 0/0.3 ns. El legado tiene un sesgo de 0.57–2.69 nm (RMSE/CRB 1.12–2.06) que sigue al sesgo asintótico calculado (guion negro); los dos estimadores de mezcla quedan en 0.011–0.112 nm y RMSE/CRB 0.982–1.022. El CRB es el del modelo con fuga (con fondo libre, el suyo). Conclusión: modelar la fuga elimina el sesgo (F104) y alcanza el CRB con fuga. Fuente: results/compare_legacy_vs_v2.json:cases[*].estimators.{legacy,mixing,mixing_freebg}.{bias_abs,rmse_over_crb},cases[*].legacy_asymptotic_bias_nm. [src:fig-legacy_vs_v2] (Figura y leyenda de R3, Worker 2: se dibujan desde los JSON verificados; la verificación de la figura en sí está pendiente.)
+### Estudio de desalineación con v2
+results/study_v2.json ya existe (Worker 1, R3), pero todavía no lo verificó nadie independiente. Por la regla del reporte (solo lo verificado), sus números no se transcriben aquí hasta que el verificador los confirme. Se reproduce con python scripts/study_misalignment_v2.py.
+### 9. Validación de la matriz de mezcla
+Cij = probabilidad de que un fotón del haz j se cuente en la ventana i (periódica, estado estacionario). Columnas = haz de origen [src:mix-valid].
+Sin IRF
+ | ventana 0 | 0.9092 | 0.0001 | 0.0024 | 0.0467
+ | ventana 1 | 0.0467 | 0.9092 | 0.0001 | 0.0024
+ | ventana 2 | 0.0024 | 0.0467 | 0.9092 | 0.0001
+ | ventana 3 | 0.0001 | 0.0024 | 0.0467 | 0.9092
+IRF gaussiana 0.3 ns FWHM
+ | ventana 0 | 0.8973 | 0.0001 | 0.0024 | 0.0467
+ | ventana 1 | 0.0467 | 0.8973 | 0.0001 | 0.0024
+ | ventana 2 | 0.0024 | 0.0467 | 0.8973 | 0.0001
+ | ventana 3 | 0.0001 | 0.0024 | 0.0467 | 0.8973
+Validación contra sim_exp + nMINFLUX del legado a 0.001 fotones/ciclo, Ns = 2000, Nb = 200, λ = [0.12, 0.28, 0.35, 0.25], 2000 llamadas, 4.16·106 fotones en ventanas [src:mix-valid]:
+ | ventana | sim_exp | mezcla | desvío (SE) | ingenuo (Ec. 3.5) | desvío (SE)
+ | 0 | 0.13640 ± 0.00017 | 0.13650 | -0.56 | 0.13182 | 27.6
+ | 1 | 0.27007 ± 0.00022 | 0.27042 | -1.62 | 0.27727 | -32.8
+ | 2 | 0.33853 ± 0.00023 | 0.33854 | -0.05 | 0.34091 | -10.3
+ | 3 | 0.25501 ± 0.00021 | 0.25455 | 2.16 | 0.25000 | 23.6
+ | χ² (3 g.l.) | 5.66 (p = 0.129) | 1927 (p = 0 numérico)
+En esta configuración la ventana 0 tiene un 8.84 % de fotones que vienen de otros haces por fuga y un 14.2 % de fondo [src:mix-valid]. El verificador reprodujo la validación con otro λ y otras semillas [src:mixclaim-MIX-VALID].
+[IMG alt=Validación de la matriz de mezcla contra sim_exp]
+Validación de la matriz de mezcla contra sim_exp. Fracciones por ventana que produce sim_exp + nMINFLUX del legado (2000 llamadas, 4.16e+06 fotones en ventanas, 1e-03 fotones/ciclo, λ = [0.12, 0.28, 0.35, 0.25], SBR 10) frente al modelo de mezcla (C con τ = 4.21 ns y ventanas [0, 10.1] ns) y al modelo ingenuo sin fuga de pos_MINFLUX/crb_minflux (Ec. 3.5). Las barras de ±SE (≈2e-4) son más chicas que el trazo. Derecha: desvío por ventana en unidades de SE. La mezcla es consistente (χ² = 5.66, 3 g.l., p = 0.129; desvíos entre -1.6 y +2.2 SE) y el ingenuo queda rechazado (χ² = 1927, desvío de +27.6 SE en la ventana 0). Conclusión: sim_exp sí tiene fuga entre pulsos y el estimador legado no la modela. Fuente: results/mixing_validation.json:frac_observed,frac_mixing,frac_naive,dev_se_mixing,dev_se_naive,chi2_pvalue_mixing_vs_sim_exp,chi2_pvalue_naive_vs_sim_exp. [src:fig-mixing_validation] (Figura y leyenda de R3, Worker 2: se dibujan desde los JSON verificados; la verificación de la figura en sí está pendiente.)
+### Tasa finita: qué hace sim_exp cuando llegan varios fotones por ciclo
+ | fotones/ciclo | fotones | p mezcla | p “gana k más alto” | p “primer fotón” | máx |sesgo| (SE por loc. de 2000 fotones)
+ | 0.0010 | 2.1·106 | 0.144 | 0.148 | 0.128 | 0.009
+ | 0.0030 | 2.1·106 | 0.599 | 0.762 | 0.201 | 0.026
+ | 0.0100 | 4.2·106 | 1.7·10-4 | 0.812 | 2.7·10-18 | 0.086
+ | 0.0300 | 2.1·106 | 2.9·10-26 | 0.149 | 5.8·10-97 | 0.260
+ | 0.1000 | 1.0·106 | 3.9·10-122 | 0.657 | <10−300 | 0.900
+ | 0.3000 | 1.0·106 | <10−300 | 0.905 | <10−300 | 3.058
+[src:rate-sweep]
+MIX-HIGHEST: el predictor 'gana el k mas alto' (recorte por ranura + sobrescritura) describe sim_exp de 1e-3 a 0.3/ciclo; datos propios: p=0.79 (1e-3), 0.76 (5e-3), 0.77 (0.0105, 1.8e7 fotones), 0.14 (0.1); predictor propio por patrones = numeros de W1 dentro de 1e-6 [src:mixclaim-MIX-HIGHEST]
+MIX-STUDY: a 0.0105/ciclo (M_p=2e5, Nh=2100) sim_exp se aparta de la mezcla ideal de forma detectable en conjunto (propio: p=2e-22 con 1.8e7 fotones), pero por localizacion de 2000 fotones es <=0.09 SE (lambda de W1) / 0.10 SE (lambda propio); sesgo [-4.58e-4,-6.67e-4,+2.16e-4,+9.09e-4] para el lambda de W1 [src:mixclaim-MIX-STUDY]
+MIX-TRACKING: de 1e-3 a 5e-3/ciclo el sesgo por ventana es 1e-4 a 5e-4, <=0.05 SE por localizacion de 2000 fotones [src:mixclaim-MIX-TRACKING]
+MIX-NDETECT (corregida): entre 1e-3 y 5e-3 fotones/ciclo el sesgo de sim_exp respecto de la mezcla ideal se puede detectar en conjunto; a 5e-3 bastan ~1e7 fotones (el verificador A lo detectó con 1.2e7: mezcla p = 4.6e-4, 'highest' p = 0.76). El número necesario escala ~1/tasa², así que el 3e7 corresponde a 3e-3 (y ~2.5e8 a 1e-3 por la misma escala; W1 dio 2.6e8, sin re-correr). Por localización de 2000 fotones sigue siendo ≤0.05 SE (MIX-TRACKING). [src:mixclaim-MIX-NDETECT]
+MIX-EARLIEST: un TCSPC de primer foton sesga en espejo respecto de sim_exp; a 0.3/ciclo ea-mix=[+0.0153,+0.0210,-0.0081,-0.0282] (propio: +0.01532,+0.02104,-0.00812,-0.02824); los datos de sim_exp rechazan 'earliest' (p=1.6e-15 a 5e-3) [src:mixclaim-MIX-EARLIEST]
+[IMG alt=Desvío por tasa finita: 'highest' y 'earliest' frente a la mezcla]
+Desvío por tasa finita: 'highest' y 'earliest' frente a la mezcla. Máximo sobre las 4 ventanas del desvío predicho (exacto a tasa finita, pminflux_sim.mixing) entre las fracciones por ventana y el modelo de mezcla (tasa → 0), en SE de una localización de 2000 fotones, frente a la tasa por ciclo (Ns 2000, Nb 200, λ = [0.12, 0.28, 0.35, 0.25], τ = 4.21, [0, 10.1] ns). 'earliest' se reescaló de SE totales a SE por localización con √(2000/n_detected_total), el mismo factor que reproduce la clave de 'highest'. Las dos curvas se superponen: 'earliest' tiene la misma magnitud y el signo opuesto. En los puntos calculados dentro de la banda del tracking (1e-3–5.5e-3 fotones/ciclo) el desvío es ≤ 0.026 SE (0.009 a 1e-3, 0.026 a 3e-3). Crece de forma lineal con la tasa: 0.086 a 0.01, 0.90 a 0.1 y 3.06 a 0.3/ciclo. Los rombos/triángulos son la configuración de los estudios a 0.0105/ciclo (0.093 y 0.097 SE). Conclusión: la sobrescritura por ciclo de sim_exp (F101) existe, pero no importa en el régimen del tracking. Fuente: results/mixing_rate_sweep.json:points[*].pred_highest_minus_mixing_in_se_per_2000ph_localization,points[*].pred_earliest_minus_mixing_in_se,studies_config. [src:fig-rate_sweep] (Figura y leyenda de R3, Worker 2: se dibujan desde los JSON verificados; la verificación de la figura en sí está pendiente.)
+Lectura física. sim_exp se queda con el fotón del haz de índice más alto cuando un ciclo tiene fotones de dos haces (F101); un TCSPC real se queda con el primero. Son sesgos de signo opuesto. A las tasas del tracking (1–5·10−3 fotones/ciclo) los dos son ≤ 0.05 SE por localización: detectables solo sumando ~107 fotones, irrelevantes para una localización [src:mixclaim-MIX-TRACKING].
+Nota sobre la fórmula del test de aceptación: MIX-ACCFORMULA: la formula de C del test de aceptacion omite la imagen m=-1 cuando la ventana cruza T (K=3, tau=8, a=2, b=16: falta 1-exp(-1.33/8)=0.153); no afecta la configuracion de referencia [src:mixclaim-MIX-ACCFORMULA]
+### 10. Límites, supuestos y puntos abiertos
+### Tiempo muerto y tasa finita
+Máximo |sesgo| por ventana del simulador v2 frente a la mezcla ideal, en SE por localización de 2000 fotones de señal (3000 localizaciones por caso) [src:dt-sweep]:
+ | caso | 0.0010 /ciclo | 0.0025 /ciclo | 0.0055 /ciclo | 0.0105 /ciclo
+ | highest (sim_exp), d = 0 | 0.028 | 0.043 | 0.046 | 0.109
+ | primer fotón, d = 0 ns | 0.020 | 0.043 | 0.061 | 0.107
+ | primer fotón, d = 22 ns | 0.030 | 0.057 | 0.079 | 0.099
+ | primer fotón, d = 50 ns | 0.017 | 0.024 | 0.017 | 0.012
+ | primer fotón, d = 100 ns | 0.024 | 0.015 | 0.034 | 0.033
+d = n·T anula el sesgo exactamente. Con un SPAD no paralizable y d ≥ T, en una ventana de largo d cabe a lo sumo una avalancha, así que la probabilidad de estar muerto en t es la integral de la tasa en [t − d, t]; con d = n·T esa integral es n veces las avalanchas por período, una constante, y la densidad registrada es proporcional a la incidente a cualquier tasa [src:claim-dnT]. No aplica a un detector paralizable ni a un TDC con tiempo muerto propio.
+[IMG alt=Sesgo por tiempo muerto y tasa finita en el simulador v2]
+Sesgo por tiempo muerto y tasa finita en el simulador v2. Máximo |sesgo| sobre las 4 ventanas de las fracciones del simulador v2 frente a la mezcla ideal (window_probs), en SE de una localización de 2000 fotones (3000 localizaciones por punto, semilla 20260928, IRF 0.3 ns, SBR 21), para TCSPC 'earliest' con tiempo muerto d = 0/22/50/100 ns y para 'highest' (emulación de sim_exp). El tiempo muerto de 22 ns es un SUPUESTO (valor típico de SPAD), no un valor medido. Con d = n·T (50 y 100 ns) el sesgo se anula exactamente (resultado demostrado y verificado): 0.012–0.024 y 0.015–0.034 SE, dentro del ruido de MC (franja gris, 2·SE_MC ≈ 0.037; p del χ² contra la mezcla ≥ 0.30). Con d = 22 ns: 0.030 SE a 1e-3, 0.079 a 5.5e-3 y 0.099 a 0.0105 fotones/ciclo. Conclusión: en el régimen de tracking el sesgo por tasa finita es ≤0.08 SE por localización. Fuente: results/dead_time_sweep.json:rows[*].max_abs_bias_SE_per_loc,rows[*].mc_se_in_SE_per_loc,assumptions. [src:fig-dead_time_sweep] (Figura y leyenda de R3, Worker 2: se dibujan desde los JSON verificados; la verificación de la figura en sí está pendiente.)
+### Sesgo residual del estimador de mezcla
+El modelo directo del estimador no incluye la distorsión de TCSPC y tiempo muerto a tasa finita. Eso induce un sesgo de 0.02–0.035 nm; además el MLE tiene su sesgo O(1/N) propio, ~0.036 nm con N ~ 2000 (también sobre datos multinomiales puros; no es un bug). Todo queda ≤ 0.03 CRB [src:claim-resid].
+### Supuestos declarados
+dead_time = 22 ns por defecto es un SUPUESTO (valor típico de SPAD); no es un valor medido del detector del experimento [src:dt-sweep]
+IRF gaussiana 300 ps FWHM centrada en el pulso [src:dt-sweep]
+tiempo muerto no paralizable + TCSPC primer foton por ciclo de llegada [src:dt-sweep]
+'highest' = emulacion de sim_exp (F101), sin tiempo muerto [src:dt-sweep]
+“highest” fija el SBR incidente, mientras que sim_exp fija el registrado: W2-R2 'highest reproduce sim_exp' con fondo a tasa alta — v2 fija el SBR incidente y recorta la señal registrada por (1-e^-x)/x, mientras sim_exp fija Ns:Nb registrados; a 0.0105/ciclo es 0.5 % del SBR (despreciable) y a 0.3/ciclo con fondo ~14 %; los tests de highest usan sbr=inf. Falta decidir si se documenta como limitación [src:claim-highest-sbr]. Se documenta como limitación.
+Sustitución de datos: C:\Data\psf\20260820 no existe; los EBP ideal/geom_exp/realistic_fit se reconstruyen de forma exacta (la escalera se reproduce al 4.º decimal), el sustituto 20260703 está rotulado en findings_B.json, y ninguna conclusión cualitativa de F201–F206 depende de él; los números 'Experimental' exactos (18.35/62.76/1.89) no se reprodujeron, y eso está declarado [src:claim-subst]
+AUTORIA F101-F111: no se puede verificar; no hay historial git (tampoco en GithubPRO/p-minflux-main). Solo se sostiene el docstring [Lars] de ebp_centres y que el comentario 'EXACTAMENTE' y el fast path estan en el espanol de la autora [src:claim-autoria]
+Rendimiento: el arranque en grilla del MLE no está partido en bloques (359 MB con 1e5 locs, ~3.6 GB con 1e6; free_powers lo repite en cada evaluación); el punto fijo del tiempo muerto es O(n^2) a saturación (d=500 ns, 0.3/ciclo: 13.3 s y 448 MB para 1e6 fotones). Bien a las tasas del tracking [src:claim-perf]
+Ventanas solapadas (b > T/K): el CRB multinomial deja de valer y el MLE puede caer en un óptimo local. En R2 v2 no las rechazaba [src:claim-overlap]; en R3 se agrega un ValueError explícito (salvo allow_overlap=True), pendiente de verificación.
+### Puntos abiertos
+Afirmaciones del ledger que siguen vivas (refutadas y pendientes de corrección en esta ronda, o sin reproducir por otra ruta). No se usan como resultados.
+refuted MIX-NDETECT: 'de 1e-3 a 5e-3 hacen falta 3e7-2.6e8 fotones para detectar el sesgo' — a 5e-3 se detecto con 1.2e7 fotones (mezcla p=4.6e-4, 'highest' p=0.76); N escala ~1/tasa^2, asi que en 5e-3 bastan ~1e7 (3e7 corresponde a 3e-3) [src:open-6]
+refuted F103-num: 'la ventana 0 pierde 5.9 % (tau=4.21) / 2.8 % (0.001)' — la perdida esperada es 6.84 % / 2.54 % (los valores de W2 son MC de 30 llamadas); ademas el '0.34 nm de sesgo extra' es un desplazamiento: con tau=4.21 el sesgo total con las ventanas del legado (0.88 nm) es menor que con ventanas periodicas (1.18 nm) [src:open-13]
+refuted F111-comentarios: 'los comentarios de paridad estan invertidos' — en la rama sin centro son correctos; en la rama con centro solo son incorrectos si K se lee como el total de haces (son correctos para Ktheta=K-1) [src:open-21]
+unclear F154 (descartado): se confirma el ValueError cuando M_p no es multiplo de cycle_time/dt; no reproduje el 88.5 % en la ventana 0 ni el chi2 p=0.74 con el haz recuperado del macrotiempo [src:open-26]
+unclear AUTORIA F101-F111: no se puede verificar; no hay historial git (tampoco en GithubPRO/p-minflux-main). Solo se sostiene el docstring [Lars] de ebp_centres y que el comentario 'EXACTAMENTE' y el fast path estan en el espanol de la autora [src:open-28]
+unclear F201: la clase CONCEPTUAL — con el criterio del PI (parámetro o supuesto no declarado) corresponde DISENO, y lo conceptual ya es F104. Además hay que acreditar que la autora anotó 'IRF y lifetime medidos' como pendiente (ESTADO_Y_PLAN_REALISMO_PSF.md:115-117) y que el 2.75 es respecto del CRB sin fuga (el CRB con fuga es 0.945 nm, cociente ≈2.5). Decide el PI [src:open-32]
+refuted F202 clase IMPLEMENTACION — el docstring (realistic_ebp.py:5-6) declara unidades relativas al máximo de cada PSF, así que el código hace lo que dice; con el criterio del PI es DISENO. Además el supuesto 'el máximo del .npy = potencia del haz' tiene que figurar en el hallazgo (hoy solo está en el reporte; lo apoya que el orden de los máximos se repite en 3 calibraciones), y hay que acreditar que ella ya recomendó 'permitir distinta potencia entre haces' (ESTADO…md:116) [src:open-34]
+refuted F203: 'el 100 % de las estimaciones ingenuas (sustituto) queda en el borde para los cuatro R' — con R=1.25·L es el 71–72 % (sus propios datos en w3/F203_out.json y los míos); vale para R ≤ 1.0·L. Con el R de ella (0.75) y el EBP realista, el ingenuo solo tiene un 1 % en el borde [src:open-36]
+refuted Robustez del estimador y del CRB con b > T/K no está garantizada ni avisada: con b=20, r0=(-15,15) y datos v2sim N=2095, mle_mixing (grid_step por defecto) cae en un óptimo local equivocado en 193/300 locs (16.7 nm de error medio) con converged=True y n_failed=0, e incluso con conteos exactos devuelve (-13.5, 41.0); con b=30 RMSE/CRB=0.575 (CRB multinomial inválida con ventanas solapadas). Sin guard en simulate/crb/mle_mixing [src:open-56]
+unclear Rendimiento: el arranque en grilla del MLE no está partido en bloques (359 MB con 1e5 locs, ~3.6 GB con 1e6; free_powers lo repite en cada evaluación); el punto fijo del tiempo muerto es O(n^2) a saturación (d=500 ns, 0.3/ciclo: 13.3 s y 448 MB para 1e6 fotones). Bien a las tasas del tracking [src:open-57]
+unclear Tests débiles: test_compare_json_complete no exige source==v2sim ni sha256 actuales; F204 solo comprueba SE>0; el caso none de test_low_rate pasa con p=0.0018 contra el umbral 1e-3 (con 10 semillas juntas p=0.11: es una fluctuación, pero frágil); los ceros de F102 se comprueban con la misma fórmula del código [src:open-58]
+unclear El modelo directo del estimador no incluye la distorsión de TCSPC y tiempo muerto a tasa finita: el sesgo de la mezcla llega a ~4 SE (0.098 nm) en el estudio v2sim; documentado, no es un bug; la hipótesis de W2 'd = n*T anula el sesgo' no está verificada [src:open-59]
+unclear Docstring de estimate: 'con free_bg local el CRB crece mucho' contradice los datos propios (1.000-1.038x). Con N baja el 1.3% sale converged=False aunque está en el óptimo (dNLL<=1e-6) [src:open-60]
+unclear Usabilidad como reemplazo: faltan README, ejemplo de punta a punta, notas de migración legado->v2, __init__.py desactualizado (no expone simulate/estimate/psf), empaquetado, una función pública para contar microtiempos reales en ventanas, y el port de F107; report/index.html ausente (aceptación en rojo). Obligatorio en R3 [src:open-61]
+refuted W2-R2 'el valor esperado del doble conteo con b=13, tau=4.21 es 11.15 %' (referencia del test) — el exacto es 11.175 % (cuadratura propia 0.111746; MC propio 1.05e8 fotones 11.173±0.003 %; v2 1.05e7 fotones 11.174±0.010 %, sin sesgo); el 11.11 % reportado es la semilla 51 (8.4e5 fotones, -1.9 SE). Error menor de 0.025 puntos; el test pasa igual [src:open-67]
+refuted W3-R2 'el sesgo MC del MLE de mezcla en v2sim coincide con el sesgo implícito de las fracciones, así que no viene del estimador; <=0.11 nm' — el sesgo inducido por la tasa finita es ~0.02-0.035 nm (primer orden y MC con 20000 locs: +0.02 nm en x frente a multinomial); en (0,-30) SBR21 el MLE tiene by=-0.036±0.011 nm también con datos multinomiales puros (sesgo O(1/N) del MLE a N~2000, no un bug); el 0.092±0.023 de (20,0) SBR6 es ~0.03 real más una fluctuación de 2.6 sigma. La cota <=0.11 nm es verdadera pero ~3 veces holgada; todo es <=0.03 CRB [src:open-76]
+unclear W2-R2 n_mode='poisson' (media/varianza), los intervalos KS del tiempo muerto con d>T, beta libre, la fracción en el borde de F203 y el control cruzado con ts.pos_MINFLUX — sus tests pasan pero no los reproduje por otra ruta [src:open-82]
+unclear W2-R2 'highest reproduce sim_exp' con fondo a tasa alta — v2 fija el SBR incidente y recorta la señal registrada por (1-e^-x)/x, mientras sim_exp fija Ns:Nb registrados; a 0.0105/ciclo es 0.5 % del SBR (despreciable) y a 0.3/ciclo con fondo ~14 %; los tests de highest usan sbr=inf. Falta decidir si se documenta como limitación [src:open-83]
+### Trabajo de la ronda 3 pendiente de verificación
+Lo que los workers de R3 reportan y el verificador todavía no reprodujo. No se usa como resultado en este documento.
+W1-R3 guard b>T/K: simulate_counts, crb, mle_mixing y count_windows levantan ValueError 'ventanas solapadas' con b=20,T=50,K=4; con allow_overlap=True emiten UserWarning y siguen; b=T/K no avisa [src:r3-worker-1-0]
+W1-R3 compare_legacy_vs_v2.json regenerado con el código R3 (semilla 20260928): 0 diferencias numéricas contra el de R2; sha256 de simulate/estimate actuales; test_compare_json_complete exige v2sim y sha [src:r3-worker-1-1]
+W1-R3 count_windows reproduce exactamente los counts de simulate_counts desde return_tags; a 1e-4/ciclo chi2 contra window_probs p=0.184 (394059 fotones) [src:r3-worker-1-2]
+W1-R3 arranque en grilla por bloques (chunk) da r/converged/beta/powers idénticos bit a bit [src:r3-worker-1-3]
+W1-R3 converged: con N=10-50 (6000 locs) converged=False baja de 43 a 5 sin cambiar las estimaciones; los 5 restantes están a 1e-5-2e-5 de NLL y 0.03-0.10 nm del óptimo [src:r3-worker-1-4]
+W1-R3 F107 portado: con t_mask=0 en la mitad y sin fondo, 0 fotones de señal en la mitad apagada; con SBR 5 la fracción apagada es 0.1429 (1/7) [src:r3-worker-1-5]
+W1-R3 study_v2 (N=2095): mezcla con P conocidas máx|b| 0.117 (ideal) / 0.086 nm (desalineada), RMSE/CRB 0.996/1.003; legado 3.116/3.176 nm, 1.671/1.726; ingenuo desalineado 8.583 nm, 4.093; runtime 45.4 s [src:r3-worker-1-6]
+W1-R3 potencias libres sesgadas por parámetros incidentales: N=400 desalineada P/P0 0.847/1.160/1.188 con 1600 locs/pos contra 0.792/1.092/1.088 [src:r3-worker-1-7]
+W1-R3 findings.json: 16 ids iguales, todos verified, 19 v2_test(s) existen; F205 dice 0.912 correcto y 0.960 inflado por 0.4455 nm [src:r3-worker-1-8]
+W1-R3 discover -s tests: 64 tests OK en 61.8 s; sha256 de test_acceptance.py intacto [src:r3-worker-1-9]
+### Lo que más se podría hacer después
+Propuestas del PI (no son resultados) [src:pi-next].
+Validar v2 contra datos reales 20260707: contar microtiempos con count_windows y comparar con el τ y la fuga medidos (~12 % en w0, 5.2 % global). Es la prueba de que el modelo directo describe el instrumento. Costo: ~1 ronda (1 worker + verifier).
+Medir el tiempo muerto real del APD y reemplazar el supuesto de 22 ns. Cambia el sesgo por tasa finita salvo con d = n·T. Costo: una medición y un rerun del barrido.
+Rehacer los estudios con las PSF medidas 20260820 cuando estén en disco. Los números "Experimental" (18.35/62.76/1.89) no se reprodujeron. Costo: ~0.5 ronda.
+Incluir en el modelo directo la distorsión de TCSPC/tiempo muerto a tasa finita, en primer orden. Elimina el sesgo residual de ~0.03 CRB a tasas altas. Costo: 1 ronda (worker + verifier).
+Endurecer los tests débiles (F204 SE>0, el umbral de test_low_rate con varias semillas, F102 con una fórmula independiente). Costo: pequeño.
+Reproducir por otra ruta n_mode = 'poisson', el KS con d > T, beta libre y el control cruzado con pos_MINFLUX (siguen unclear). Costo: ~0.5 ronda del verificador.
+Punto fijo del tiempo muerto en O(n log n) para saturación. Solo importa fuera del régimen de tracking. Costo: pequeño a medio.
+Portar F107 (máscara de parpadeo), si W1 no llegó. Costo: pequeño.
+Recuperar la autoría con el historial de la autora (si ella tiene git o backups), para cerrar el "no verificable". Costo: depende de ella.
+### 11. Apéndice: sospechas descartadas
+Sospechas que se investigaron y se descartaron (o quedaron sin decidir) [src:discarded].
+ | id | sospecha | evidencia | estado
+ | F105 | (v) Ns y Nb fijos exactos en sim_exp vs el modelo Mult(N,p) del CRB | Real pero despreciable: con Ns y Nb fijos la σ del MLE (sándwich) es 0–0.71 % menor que el CRB multinomial en los 5 puntos (verificador: 0.993–1.000; 0.990 en (40,0)). RMSE/CRB de los estudios queda sesgado a la baja < 1 %. | discarded-verified
+ | F151 | (vii) crb_minflux vs donutloc.fisher | Correcto: crb_minflux (método 1, px = 1) coincide con un Fisher continuo independiente dentro de 4.4e-4 nm (W2: métodos 1–3 contra donutloc dentro de 5.4e-4 con px = 1, error O(px²)). | discarded-verified
+ | F152 | (v) fondo solo en ciclos sin senal y sin recorte TCSPC; muestreo en dos pasos; pliegue % dt | El fondo aporta exactamente Nb·b/T por ventana (lo confirman las 4 campañas del verificador), el muestreo en dos pasos es exacto por factorización y el pliegue % dt es periódico para los conteos. cota ≤3.6e-4 no verificada (pérdida selectiva por haz que impondría un TCSPC real a la tasa de los estudios) | discarded-verified
+ | F153 | spaceToIndex/indexToSpace vs la grilla de psf() | spaceToIndex con rint coincide con el mínimo de psf() (0/20 discrepancias); el truncado viejo sesgaba (−0.50, +0.50) nm con px = 1: la corrección de la autora es correcta. | discarded-verified
+ | F154 | (ix) rama cw_minflux | Confirmado: np.reshape falla con ValueError cuando M_p no es múltiplo de cycle_time/dt. Ningún script usa la rama cw. Falta: No se reprodujo el 88.5 % de fotones en la ventana 0 con nMINFLUX ni el χ² p = 0.74 con el haz recuperado del macrotiempo; para decidir hace falta re-correr scripts/findings/F154_cw_minflux_branch.py con otra semilla y un contador por macrotiempo independiente. | unclear
+ | D-iv | (iv) docstring de dt 'typically 25 ns' | No es un error: 25 ns era el setup de 40 MHz de Masullo (simulations_example.py:47). Los scripts de la autora pasan dt=50 (simulation_misalignment.py:54, make_fig_eficiencia.py:39). Solo actualizar el docstring. | discarded-verified
+ | D-ii | (ii) desigualdad estricta en los bordes de nMINFLUX | Los microtiempos son continuos: la unica masa puntual es el 0.0 de los ciclos vacios (F102). Fuera de eso el borde abierto/cerrado no cambia ningun conteo con probabilidad 1. | discarded-verified
+ | D-vi | (vi) NaN -> -inf en pos_MINFLUX | Correcto para los bordes rellenados con ceros (normPSF=0). El unico caso patologico es SBR=inf (F110). | discarded-verified
+ | F290-D1 | Fallos de sim_exp descartados sin reportar la tasa | sim_exp no falla en las configuraciones de los estudios (0/300 con Ns = 2000); el margen mínimo de ciclos es 3 / 55 / 76 / 105 para Ns = 90 / 1440 / 2000 / 2880. La tasa de fallos es 0 igual, así que no reportarla no cambia nada. | discarded-verified
+ | F290-D2 | Convención de ejes (flip y/-y) inconsistente entre psf(), Grid y ebp | La convención de ejes de psf()/Grid/ebp es consistente: una dona independiente coincide con ebp_ideal a 3e-16 y argmin = posición redondeada. La orientación física respecto del escáner no se puede comprobar desde el código. | discarded-verified
+ | F290-D3 | simulations_example.py (Masullo) l.183-184: el reshape tras quitar NaN mezcla x e y | El reshape tras quitar NaN en simulations_example.py:182-183 conserva los pares (x, y), porque los NaN vienen por columnas completas. | discarded-verified
+ | F290-D4 | Usar conteos multinomiales en vez de sim_exp (F203-F205, y el MC rápido de ella) no es equivalente | Con Tlife = 0.001 y b = dt/K las fracciones por ventana de sim_exp coinciden con el modelo 1/K (628 500 fotones, |z| ≤ 1.3). La conclusión (equivalencia) se mantiene. | discarded-verified
+ | F290-D5 | El centrado entero de ebp_experimental deja los mínimos corridos respecto de pos_nm | El centrado entero de ebp_experimental deja argmin = pos_nm en los 4 haces (PSF 20260703). | discarded-verified
+ | F290-D6 | zero_ratio de fit_donut_fwhm mal calculado | zero_ratio usa min/max del mapa 2D mientras el docstring dice 'del perfil' (ebp.py:545 contra :578); es solo una inconsistencia del docstring, y el valor del mapa es la mejor estimación. | discarded-verified
+ | F290-D7 | La comparación honesta/ingenua no es justa | La comparación honesta/ingenua es justa: una semilla antes de todos los casos y el mismo r0, SBR y R_SEARCH_NM (simulation_misalignment.py:250-256). | discarded-verified
+ | F290-D8 | El CRB con N = Ns+Nb y fondo en p no es comparable con un MC de N fijo | El CRB con N = Ns + Nb es consistente con el MC de N fijo: max|p_crb − p_MC| en r0 = 4e-4 y un Fisher independiente da 0.864 nm, igual que el legado. | discarded-verified
+### Versiones de los datos
+sha256 (16 primeros caracteres) de cada archivo leído al generar este reporte.
+ | results/findings.json | 9500778a868f2d9d
+ | results/findings_discarded.json | 7b3ca50f6090ede6
+ | results/mixing_validation.json | 79eb65b6b90eb1cc
+ | results/mixing_claims.json | 1513b9af794943c3
+ | results/mixing_rate_sweep.json | 31ebc0fb24eec6bc
+ | results/dead_time_sweep.json | 8eb0371497e7ebf1
+ | results/compare_legacy_vs_v2.json | 436697e95bf06b6f
+ | results/study_v2.json | 08979a866b90d464
+ | report/figs/captions.json | 641a65aeb5f4bf92
+ | equipo/2026-09-28_review-pminflux-sim/state.json | 616d5c80b46b0b4d
+ | scripts/build_report.py | d4b249ebf2420b85

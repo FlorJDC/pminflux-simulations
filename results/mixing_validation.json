@@ -213,5 +213,65 @@
  "seed_base": 20260928,
  "calls_per_chunk": 20,
  "runtime_s": 345.96954798698425,
- "script": "scripts/validate_mixing_matrix.py"
+ "script": "scripts/validate_mixing_matrix.py",
+ "variant_Nb0_replica": {
+  "desc": "replica de variant_Nb0 con otra semilla base (mismo setup); no reemplaza a las claves de aceptacion",
+  "Nb": 0,
+  "Ns": 2000,
+  "M_p": 2200000,
+  "factor": 1.05,
+  "n_detected_total": 2070181,
+  "counts_observed": [
+   262925.0,
+   563330.0,
+   716472.0,
+   527454.0
+  ],
+  "frac_observed": [
+   0.12700580287424143,
+   0.2721163028739999,
+   0.34609147702543885,
+   0.25478641722631984
+  ],
+  "frac_mixing": [
+   0.12692841909035824,
+   0.2721400163921373,
+   0.34600201297177746,
+   0.25492955154572694
+  ],
+  "frac_sim_exp_highest_model": [
+   0.1268850469734096,
+   0.27207696423242544,
+   0.34602252410404416,
+   0.2550154646901207
+  ],
+  "chi2_mixing": 0.3162032922029874,
+  "chi2_pvalue_mixing": 0.9569528234567328,
+  "dev_se_mixing": [
+   0.334464292873923,
+   -0.07666197876574705,
+   0.27059839294340937,
+   -0.4725406520888758
+  ],
+  "chi2_pvalue_sim_exp_highest_model": 0.8722588164060853,
+  "dev_se_sim_exp_highest_model": [
+   0.5220013015116675,
+   0.12718470878581423,
+   0.20855626953442907,
+   -0.756088719721724
+  ],
+  "chi2_pvalue_naive": 0.0,
+  "dev_se_naive": [
+   31.019165738079444,
+   -25.263227127441546,
+   -11.790334534715573,
+   15.90428230656495
+  ],
+  "n_calls_ok": 1080,
+  "n_calls_failed": 0,
+  "per_call_chi2_mean": 2.979537651766324,
+  "runtime_s": 116.95896100997925,
+  "seed_base": 20460928,
+  "script": "scripts/validate_mixing_matrix.py --only nb0-replica"
+ }
 }

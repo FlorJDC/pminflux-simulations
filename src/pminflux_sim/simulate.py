@@ -300,7 +300,7 @@ def _simulate_block(rng, q, Nrow, p, fs, sigma, mask=None):
 
 
 def simulate_counts(lambda_beams, n_loc, N, sbr, params=None, rng=None, return_tags=False,
-                    t_mask=None):
+                    t_mask=None, sbr_reference="on"):
     """Simula ``n_loc`` localizaciones p-MINFLUX y devuelve los conteos por ventana.
 
     lambda_beams: (K,) o (n_loc, K), excitación relativa (se normaliza por localización después de
@@ -322,7 +322,15 @@ def simulate_counts(lambda_beams, n_loc, N, sbr, params=None, rng=None, return_t
         ``t_mask[ciclo % M]`` (la simulación corre hasta la N-ésima detección, así que el número de
         ciclos no está fijo). En un ciclo apagado no hay fotones de SEÑAL; el fondo sigue igual
         (port de F107: en el legado ``sim_exp('p_minflux')`` ignoraba la máscara). La tasa
-        ``rate_per_cycle`` y ``sbr`` se refieren a los ciclos encendidos.
+        ``rate_per_cycle`` se refiere a los ciclos encendidos; ``sbr``, según ``sbr_reference``.
+    sbr_reference: con ``t_mask``, a qué ciclos se refiere ``sbr``. ``"on"`` (default): Ns/Nb de
+        los ciclos ENCENDIDOS; el SBR detectado del conjunto baja con la fracción encendida f_on
+        (SBR efectivo ~ sbr * f_on; con f_on = 0.5 y sbr = 21 sale ~10.5 y hay que pasarle ese
+        valor, o ``free_bg='shared'``, al estimador). ``"total"``: ``sbr`` = Ns/Nb del conjunto
+        de ciclos (lo que hacía el legado, que fijaba Ns y Nb): internamente se usa
+        ``sbr/f_on`` en los ciclos encendidos, con ``f_on = mean(t_mask)`` (exacto si el número
+        de ciclos simulados es múltiplo de ``len(t_mask)``, aproximado si no). Sin ``t_mask`` las
+        dos opciones son idénticas.
     """
     p = params if params is not None else SimParams()
     _check(p)
@@ -338,6 +346,13 @@ def simulate_counts(lambda_beams, n_loc, N, sbr, params=None, rng=None, return_t
         if not tm.any() and sbr is not None and math.isinf(float(sbr)):
             raise ValueError("t_mask todo apagado y sin fondo: no hay fotones que detectar")
         mask = tm
+    if sbr_reference not in ("on", "total"):
+        raise ValueError("sbr_reference debe ser 'on' o 'total'")
+    if sbr_reference == "total" and mask is not None and sbr is not None             and not math.isinf(float(sbr)) and float(sbr) > 0:
+        f_on = float(mask.mean())
+        if f_on <= 0.0:
+            raise ValueError("t_mask todo apagado: no hay señal para un sbr total > 0")
+        sbr = float(sbr) / f_on
     if rng is None:
         rng = np.random.default_rng()
     elif not isinstance(rng, np.random.Generator):

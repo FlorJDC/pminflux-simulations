@@ -42,7 +42,6 @@ Uso (desde la raíz):  python scripts/study_misalignment_v2.py [--seed 20260928]
 """
 
 import argparse
-import hashlib
 import json
 import math
 import os
@@ -60,6 +59,8 @@ from pminflux_sim import mixing as mx  # noqa: E402
 from pminflux_sim import psf  # noqa: E402
 from pminflux_sim import estimate as es  # noqa: E402
 from pminflux_sim import simulate as sim  # noqa: E402
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from provenance_sha import sha256_file  # noqa: E402
 
 DEFAULT_OUT = os.path.join(ROOT, "results", "study_v2.json")
 SETUP = dict(T=50.0, K=4, tau=4.21, a=0.0, b=10.1, irf_fwhm=0.3, rate_per_cycle=2.5e-3,
@@ -89,11 +90,8 @@ NOTE_FREE_POWERS = (
 
 
 def _sha(path):
-    try:
-        with open(path, "rb") as fh:
-            return hashlib.sha256(fh.read()).hexdigest()
-    except IOError:
-        return None
+    """sha256 con fin de línea normalizado (CRLF -> LF): robusto a git autocrlf."""
+    return sha256_file(path)
 
 
 def ideal_like(pos_meas):

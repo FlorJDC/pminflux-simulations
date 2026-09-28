@@ -1,3 +1,12 @@
+# Todo el proyecto: texto con LF en el repositorio y en el árbol de trabajo (R3: los sha256 de
+# results/*.json y de report/ no deben depender de core.autocrlf). Los binarios, tal cual.
+* text=auto eol=lf
+*.png  binary
+*.npy  binary
+*.npz  binary
+*.docx binary
+*.pdf  binary
+
 # Line endings for the agent-team files only (does not touch the rest of a project):
 # shell scripts break with CRLF; Windows launchers want CRLF.
 *.sh            text eol=lf

@@ -36,8 +36,10 @@ from .mixing import (  # noqa: F401
     sim_exp_window_probs,
 )
 from .simulate import SimParams, simulate_counts, DEAD_TIME_ASSUMPTION  # noqa: F401
-from .windows import count_windows  # noqa: F401
-from .psf import beam_positions, lambda_beams  # noqa: F401
+from .windows import (  # noqa: F401
+    count_windows, check_overlap, window_starts, mixing_matrix_starts,
+)
+from .psf import beam_positions, lambda_beams, donut, gaussian  # noqa: F401
 from .estimate import (  # noqa: F401
     mle_mixing,
     mle_legacy,
@@ -45,6 +47,7 @@ from .estimate import (  # noqa: F401
     crb_legacy,
     forward_probs,
     cov_ellipse,
+    mixing_conditioning,
     MLEResult,
 )
 
@@ -62,7 +65,8 @@ __all__ = [
     "sim_exp_window_probs",
     # v2
     "SimParams", "simulate_counts", "DEAD_TIME_ASSUMPTION",
-    "count_windows",
-    "beam_positions", "lambda_beams",
-    "mle_mixing", "mle_legacy", "crb", "crb_legacy", "forward_probs", "cov_ellipse", "MLEResult",
+    "count_windows", "check_overlap", "window_starts", "mixing_matrix_starts",
+    "beam_positions", "lambda_beams", "donut", "gaussian",
+    "mle_mixing", "mle_legacy", "crb", "crb_legacy", "forward_probs", "cov_ellipse",
+    "mixing_conditioning", "MLEResult",
 ]

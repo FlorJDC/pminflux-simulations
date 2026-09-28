@@ -83,9 +83,12 @@ El mismo flujo, con tabla de resultados, está en `scripts/example_end_to_end.py
 | Reporte HTML | `python scripts/build_report.py` | `report/index.html` | < 1 min |
 
 Todos los scripts tienen semilla fija y escriben en el JSON los parámetros, las semillas, las
-versiones y el sha256 del código que los generó. `tests/test_estimate.py` y
-`tests/test_usability.py` fallan si `compare_legacy_vs_v2.json` o `study_v2.json` no
-corresponden al código actual: después de tocar `src/`, regenerarlos.
+versiones y el sha256 del código que los generó. El sha256 se calcula con los finales de línea
+normalizados a LF (`scripts/provenance_sha.py`), así que no cambia si git saca los archivos con
+CRLF (`core.autocrlf=true` en Windows); además `.gitattributes` fija `eol=lf` para el texto.
+`tests/test_estimate.py` y `tests/test_usability.py` fallan si `compare_legacy_vs_v2.json` o
+`study_v2.json` no corresponden al código actual: después de tocar `src/` o esos scripts,
+regenerarlos.
 
 ## 4. Módulos y API
 
@@ -93,16 +96,28 @@ corresponden al código actual: después de tocar `src/`, regenerarlos.
 |---|---|---|
 | `mixing` | Matriz de mezcla C y modelos de probabilidades por ventana | `mixing_matrix`, `window_expected`, `window_probs`, `naive_probs`, `pearson_chi2`, `sim_exp_window_probs` |
 | `simulate` | Simulador fotón por fotón en dominio temporal (TCSPC, tiempo muerto, IRF, fondo, parpadeo) | `SimParams`, `simulate_counts` |
-| `windows` | Conteo por ventana desde microtiempos | `count_windows`, `check_overlap` |
+| `windows` | Conteo por ventana desde microtiempos; C para comienzos/pulsos arbitrarios | `count_windows`, `check_overlap`, `window_starts`, `mixing_matrix_starts` |
 | `psf` | Posiciones de los haces y perfiles | `beam_positions`, `lambda_beams`, `donut`, `gaussian` |
-| `estimate` | MLE con mezcla, MLE del legado, CRB, elipse | `mle_mixing`, `mle_legacy`, `crb`, `crb_legacy`, `forward_probs`, `cov_ellipse` |
+| `estimate` | MLE con mezcla, MLE del legado, CRB, elipse, aviso de C casi singular | `mle_mixing`, `mle_legacy`, `crb`, `crb_legacy`, `forward_probs`, `cov_ellipse`, `mixing_conditioning` |
 
-Todo lo anterior se puede importar directamente de `pminflux_sim` (`pm.__version__ == "2.0.0"`).
+Todo lo de la última columna se puede importar directamente de `pminflux_sim` (p. ej.
+`pm.donut`, `pm.check_overlap`; `pm.__version__ == "2.0.0"`; lo comprueba
+`tests/test_usability.py`). El resto de cada módulo, con el prefijo (`pm.psf.beam_profile`,
+`pm.estimate.capture_fraction`, ...).
 
 Opciones útiles:
 
 - `simulate_counts(..., t_mask=m)`: parpadeo del emisor (0/1 por ciclo, extensión periódica); en
-  un ciclo apagado no hay señal, el fondo sigue (port de F107).
+  un ciclo apagado no hay señal, el fondo sigue (port de F107). **Ojo con el SBR**: por defecto
+  (`sbr_reference="on"`) `sbr` y `rate_per_cycle` se refieren a los ciclos **encendidos**, así que
+  el SBR detectado del conjunto baja con la fracción encendida f_on (≈ `sbr·f_on`: con la mitad de
+  los ciclos apagados y `sbr = 21` se detecta SBR ≈ 10.5). Al estimar hay que pasar ese SBR
+  efectivo (o `free_bg="shared"`); pasar `sbr = 21` sesga ~0.3 nm (5–7 SE con 400 locs, según el
+  code-reviewer R3). `sbr_reference="total"` reproduce el legado, que fijaba Ns y Nb del
+  conjunto: `sbr` es Ns/Nb de todos los ciclos (internamente se usa `sbr/f_on` en los
+  encendidos, con f_on = `mean(t_mask)`).
+- `mle_mixing` y `crb` avisan (`UserWarning`) si C es casi singular (cond > 1e3 o valor singular
+  mínimo < 1e-2; `pm.mixing_conditioning(C)`): las ventanas no separan los haces.
 - `SimParams(tcspc=...)`: `"earliest"` (TCSPC real, default), `"highest"` (emula `sim_exp`, F101),
   `"none"`. `SimParams(counting="legacy")` emula `nMINFLUX` con sus defectos (F102/F103).
 - `SimParams(beam_powers=[...])`: potencias relativas de los haces (F202).
@@ -125,8 +140,14 @@ Opciones útiles:
   el setup medido `C[i, i] = 0.8973` y `C[i+1, i] = 0.0467`.
 - **N** = Ns + Nb = fotones **detectados en el ciclo completo** (después del TCSPC y del tiempo
   muerto), no solo los que caen en ventanas. El CRB usa N × (fracción capturada en ventanas).
+  Con datos reales: `counts, outside = pm.count_windows(..., return_outside=True)` y
+  `N = counts.sum(-1) + outside` con `crb(..., N)` (default `n_is="cycle"`), o bien
+  `N = counts.sum(-1)` con `crb(..., n_is="windows")`. Las dos coinciden si el modelo describe
+  bien la fracción que cae fuera de las ventanas; la segunda no depende de eso.
 - **SBR** = Ns/Nb (del ciclo completo; en el simulador, de los fotones incidentes). `sbr = inf` es
-  sin fondo. **β** = Nb/(Ns+Nb) = 1/(1+SBR). El fondo es uniforme: aporta `b/T` por ventana.
+  sin fondo. Con parpadeo (`t_mask`) el `sbr` del simulador es, por defecto, el de los ciclos
+  encendidos y no el del conjunto (ver §4, `sbr_reference`); el estimador siempre usa el SBR del
+  conjunto de fotones que recibe. **β** = Nb/(Ns+Nb) = 1/(1+SBR). El fondo es uniforme: aporta `b/T` por ventana.
 - **Modelo directo**: `λ_k = P_k · I(|r − pos_k|)`, `q = λ/Σλ`, `s = C q`,
   `e = (1−β) s + β b/T`, `p = e/Σe`. Con `C = I` y `b/T = 1/K` es la Ec. 3.5 del legado.
 - **L** = diámetro del círculo de los haces (TCP con haz central); **fwhm** = FWHM del perfil (en
@@ -200,8 +221,8 @@ real de d no está medido (ver §6).
 | `pos_MINFLUX(n, PSF, SBR, px_nm, r_max_nm)` | `estimate.mle_mixing(counts, pos, fwhm, C, b, T, sbr, bounds_radius)` | continuo (sin grilla, F106/F205), con matriz de mezcla C y fondo b/T (F104); informa `on_boundary` (F203) y `converged` |
 | (para comparar con el legado) | `estimate.mle_legacy(counts, pos, fwhm, sbr, bounds_radius)` | la Ec. 3.5 de `pos_MINFLUX`, continua |
 | `crb_minflux(K, PSF, SBR, px_nm, size_nm, N)` | `estimate.crb(r, pos, fwhm, C, b, T, sbr, N)` (y `crb_legacy`) | con fuga; N del ciclo completo; estorbos `free_bg`/`free_powers`; `sbr = inf` sin NaN (F110) |
-| `psf(...)`, `beams(K, L, center, d)`, `ebp_centres(K, L, center, phi)` | `psf.beam_positions(K, L, center, phi)`, `psf.lambda_beams(r, pos, fwhm, kind)` | cualquier K (F111); la fwhm del gaussiano se respeta (F109); gradiente analítico |
-| `cov_ellipse(cov, q, nsig)` | `estimate.cov_ellipse(cov, nsig, q)` | autovectores por columnas y factor χ² aplicado (F108) |
+| `psf(...)`, `beams(K, L, center, d)`, `ebp_centres(K, L, center, phi)` | `psf.beam_positions(K, L, center, phi)`, `psf.lambda_beams(r, pos, fwhm, kind)` | cualquier K (F111); la fwhm del gaussiano se respeta (F109); gradiente analítico. En el legado `beams(..., center=False)` igual ponía haz central (compara `center is not None`); en v2 `center=False` lo quita |
+| `cov_ellipse(cov, q, nsig)` | `estimate.cov_ellipse(cov, nsig, q)` | **cambió el orden de los argumentos**: una llamada posicional del legado `cov_ellipse(cov, q)` mete `q` en `nsig`; usar palabras clave (`cov_ellipse(cov, q=0.68)`). Autovectores por columnas y factor χ² aplicado (F108) |
 | `Tlife = 0.001` (estudios) | `SimParams(tau=4.21)` | el τ real; con τ ≈ 0 no hay fuga y el estudio no ve el desajuste (F201, "crimen inverso") |
 | `dt = 50`, `b = 12.5` | `SimParams(T=50.0, b=10.1)` | ventana medida [0, 10.1] |
 
@@ -214,10 +235,61 @@ Convención de parámetros:
 | `Tlife` | `tau` (ns) |
 | `dt` (período) | `T` (ns) |
 | `a`, `b` (ventana) | `a`, `b` (ns), ventana `[i·T/K + a, +b)` mod T |
-| `M_p` (ciclos), `factor` | `rate_per_cycle` (fotones incidentes por ciclo); la simulación corre hasta N detecciones |
+| `M_p` (ciclos), `factor` | `rate_per_cycle = factor·(Ns+Nb)/M_p` (fotones incidentes, señal + fondo, por ciclo; así la tasa de señal incidente `rate·sbr/(sbr+1)` es `factor·Ns/M_p`, la de `sim_exp`); la simulación corre hasta N detecciones |
 | `px_nm`, `size_nm`, `r_max_nm` | sin grilla; `bounds_radius` (nm) = radio del disco de búsqueda |
 | `r0` en índices de píxel | `r` en nm, continuo |
 | PSF normalizadas al máximo | `powers` / `beam_powers` = potencias relativas |
+
+### Emular exactamente `sim_exp` + `nMINFLUX`
+
+Los defaults de `SimParams` son el setup **medido** (IRF 0.3 ns, tiempo muerto 22 ns, τ = 4.21),
+no los de `sim_exp`. Para reproducir un estudio del legado (p. ej. `simulations_example.py`:
+`dt = 25`, `K = 4`, `Tlife = 0.001`, `Ns = 90`, `Nb = 10`, `M_p = 2e5`, `factor = 1.05`,
+`a = 0`, `b = dt/K`) hay que fijar **todo**:
+
+```python
+p = pm.SimParams(T=25.0, K=4, tau=0.001, irf_fwhm=0, dead_time=0, a=0.0, b=25.0 / 4,
+                 tcspc="highest", counting="legacy",
+                 rate_per_cycle=1.05 * (90 + 10) / 2e5)          # factor·(Ns+Nb)/M_p
+counts = pm.simulate_counts(lam, n_loc, 90 + 10, 90 / 10., p, rng=rng)
+C = pm.mixing_matrix(0.001, 25.0, 4, 0.0, 25.0 / 4)              # sin IRF, como sim_exp: C ≈ I
+est = pm.mle_mixing(counts, pos, fwhm, C, 25.0 / 4, 25.0, 9.0, bounds_radius)  # = mle_legacy aquí
+```
+
+(Comprobado en R3: con Ns = 2000, Nb = 200, M_p = 2e5, `dt = 25`, `Tlife = 0.001` y 150
+localizaciones, las cuentas por ventana de `sim_exp` + `nMINFLUX` y las de esta emulación son
+homogéneas, χ² p = 0.85.) **Trampa**: si se deja la IRF por defecto (0.3 ns, centrada en el pulso)
+con τ ≈ 0 y `b = T/K`, la mitad de cada haz cae en la ventana anterior, C queda casi singular
+(valor singular mínimo 0.006) y el MLE se degrada (15.6 nm con la mezcla y 30.7 nm con el legado en
+el caso que probó el code-reviewer R3); `mle_mixing` y `crb` ahora lo avisan con un `UserWarning`.
+
+### Datos reales: llevar los microtiempos a la convención de v2
+
+v2 supone que el pulso del haz `j` sale en `j·T/K`, con el del haz 0 en microtiempo 0
+(`nMINFLUX(K, τ, ...)` aceptaba en cambio un array `τ` arbitrario de tiempos de pulso).
+
+1. **Offset del sync**: si el pulso del haz 0 llega en `t0` (ns) del reloj TCSPC, restarlo
+   (`pm.count_windows(micro - t0, T, K, a, b, ...)`) o, lo que es equivalente, pasar los
+   comienzos corridos: `pm.count_windows(micro, T, K, b=b, starts=pm.window_starts(T, K, a, t0))`.
+   La C es la de siempre (`pm.mixing_matrix(tau, T, K, a, b, irf_fwhm)`).
+2. **Retardos de haz no equiespaciados** (medidos: `pulse_times[j]`, ns), con ventanas que
+   arrancan en `starts[i]` (p. ej. `pulse_times + a`):
+
+   ```python
+   counts, outside = pm.count_windows(micro, T, K, b=b, starts=starts, macro_index=loc,
+                                      return_outside=True)
+   C = pm.mixing_matrix_starts(tau, T, starts, b, pulse_times=pulse_times, irf_fwhm=irf)
+   est = pm.mle_mixing(counts, pos, fwhm, C, b, T, sbr, bounds_radius)
+   k = 0                                             # una localización
+   sigma_k = pm.crb(est.r[k], pos, fwhm, C, b, T, sbr, counts[k].sum() + outside[k])
+   ```
+
+   `count_windows` exige ventanas disjuntas (separación circular mínima entre comienzos ≥ `b`).
+   Todas las ventanas tienen el mismo ancho `b`, así que el fondo sigue aportando `b/T` por
+   ventana. `mixing_matrix_starts` coincide con `mixing_matrix` para comienzos y pulsos
+   equiespaciados (test) y no modifica `mixing.py`.
+3. Un microtiempo que por redondeo se pliega a fase = T se cuenta como fase 0 (nunca queda sin
+   ventana).
 
 ## 10. Resultados del estudio v2 (`results/study_v2.json`)
 
@@ -235,7 +307,11 @@ Setup medido, dona analítica, 5 emisores continuos, 400 localizaciones por posi
 | desalineada / legado (Ec. 3.5, geometría verdadera) | 3.18 | 1.73 |
 
 El CRB es el del modelo con fuga. Los SE por bootstrap y el barrido N ∈ {100, 400, 1600} están
-en el JSON. Verificación independiente de este estudio: pendiente (ronda 3).
+en el JSON. Verificación independiente (verificador R3, con simulador, MLE y CRB propios y otra
+semilla): se reproducen la mezcla con potencias conocidas, el legado y el ingenuo (máx. |b|
+0.096/0.059, 3.107/3.142 y 8.606 nm; RMSE/CRB 0.98–1.00, 1.64–1.72 y 4.08), y el CRB coincide a 3
+decimales. Con potencias libres a N = 100, el ajuste conjunto se desboca (potencias de 3 a 9 veces
+la verdadera, ~12 % en el borde).
 
 ## 11. Estructura
 

@@ -1,0 +1,73 @@
+................................................................
+----------------------------------------------------------------------
+Ran 64 tests in 118.391s
+
+OK
+
+[converged_low_N] n=6000 at_maxiter=43 converged_False=5
+
+[background] a=0.0, b=10.1, photons=500000, z=[-2.66, 1.38, -0.66, 0.73]
+
+[background] a=-3.0, b=15.0, photons=500000, z=[-0.18, 1.0, 0.75, -0.17]
+
+[background] a=4.0, b=12.5, photons=500000, z=[-1.42, 0.67, 1.52, -0.77]
+
+[background_sbr1] photons=877371, p_mixing=0.287
+
+[t_mask] photons=200000, frac_off=0.1429, ref=0.1429
+
+[highest] irf=0.3, rate=0.3, photons_in_windows=1135823, p_highest=0.61, p_ideal=0, p_earliest=0, dev_se=[-1.02, 0.15, 1.19, -0.08]
+
+[highest] irf=0.0, rate=0.3, photons_in_windows=1150405, p_highest=0.0801, p_ideal=0, p_earliest=0, dev_se=[1.49, 1.57, -0.65, -2.03]
+
+[legacy_b13] tau=4.21, photons=838000, double=0.11112, ref=0.11175, se=0.00034
+
+[legacy_loss_w0] tau=4.21, window0_periodic=136493, loss=0.0681, ref=0.0684, se=0.00068
+
+[legacy_b13] tau=0.001, photons=838000, double=0.94933, ref=0.949, se=0.00024
+
+[legacy_loss_w0] tau=0.001, window0_periodic=74925, loss=0.02461, ref=0.0254, se=0.00057
+
+[legacy_zeros] mean_zeros=198409.935, frac_window0=0.9899
+
+[legacy_zeros_ctrl] counting=legacy, a=0.0, photons=628500, p_mixing=0.908
+
+[legacy_zeros_ctrl] counting=periodic, a=-0.25, photons=628500, p_mixing=0.0321
+
+[short_tau] tau=0.001, photons=1257000, p_naive=0.695
+
+[short_tau] tau=4.21, photons=1257000, p_naive=0
+
+[irf_wrap] a=-0.5, b=10.1, photons_in_windows=991394, p_mixing=0.511, dev_se=[1.31, -0.2, 0.48, -0.8]
+
+[irf_wrap] a=2.0, b=12.0, photons_in_windows=962903, p_mixing=0.0961, dev_se=[-2.31, -0.18, 1.09, 1.08]
+
+[irf_wrap] a=-1.5, b=12.5, photons_in_windows=1047500, p_mixing=0.701, dev_se=[-0.09, 0.68, -1.17, 0.51]
+
+[low_rate] tcspc=earliest, irf=0.3, photons_in_windows=1181709, p_mixing=0.907, p_naive=0, dev_se=[0.04, 0.73, -0.37, -0.42]
+
+[low_rate] tcspc=earliest, irf=0.0, photons_in_windows=1195767, p_mixing=0.0564, p_naive=0, dev_se=[1.03, 0.51, -2.51, 1.66]
+
+[low_rate] tcspc=none, irf=0.3, photons_in_windows=1182199, p_mixing=0.00178, p_naive=0, dev_se=[-0.05, 0.69, 3.08, -3.14]
+
+[low_rate] tcspc=earliest, irf=0.3, photons_in_windows=1181827, p_mixing=0.606, p_naive=0, dev_se=[-0.74, 0.63, 1.06, -0.59]
+
+[fixed] var_rel_dev=[0.014, -0.034, -0.0, -0.026], se_rel=0.02
+
+[poisson] mean=199.7972, var=199.4619645529106, var_rel_dev=[0.022, -0.003, -0.053, 0.033]
+
+[throughput] photons=2000000, seconds=2.31, photons_per_s=8.64e+05, extrapolated_1e5x2000_s=231.4
+
+[dead_time] d=120.0, n_gaps=199900, mean_gap=286.227, expected=286.667, ks_p=0.388
+
+[dead_time] d=60.0, n_gaps=199900, mean_gap=226.815, expected=226.667, ks_p=0.993
+
+[earliest] tau=1.5, rate=0.3, photons=1198937, p_earliest=0.73, p_highest=0, p_ideal=0, dev_se=[0.21, 0.89, -0.83, -0.09]
+
+[earliest] tau=1.0, rate=0.2, photons=1199941, p_earliest=0.202, p_highest=0, p_ideal=0, dev_se=[-1.44, 0.36, 1.99, -0.42]
+
+[earliest_tau421] rate=0.1, diff=[0.00156, -0.00084, -0.00017, -0.00055]
+
+[minimal_example] 0.33 s, crb 0.933 nm, n_failed 0
+
+[windows_low_rate] photons=394059 p_mixing=0.184 p_naive=0

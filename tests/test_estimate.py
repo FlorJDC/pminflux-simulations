@@ -506,6 +506,50 @@ class TestChunkAndConvergence(unittest.TestCase):
         self.assertLess(np.mean(r1.converged), 0.5)
 
 
+class TestMixingConditioning(unittest.TestCase):
+    """R3 (code-reviewer): aviso cuando C es casi singular (trampa de migración al emular
+    sim_exp con la IRF por defecto: tau = 0.001, b = T/K, IRF 0.3 manda ~50 % de cada haz a la
+    ventana anterior)."""
+
+    def _warns(self, fn):
+        import warnings
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            out = fn()
+        return out, [x for x in w if "casi singular" in str(x.message)]
+
+    def test_warns_on_nearly_singular_C(self):
+        C_bad = mx.mixing_matrix(0.001, 25.0, K, 0.0, 6.25, irf_fwhm=0.3)
+        cond, smin = es.mixing_conditioning(C_bad, warn=False)
+        self.assertLess(smin, es.SMIN_MIN)                 # s_min = 0.0063, cond = 160
+        pos = psf.beam_positions(K, L, center=True)
+        cnt = np.array([[500, 520, 480, 510]])
+        _, w = self._warns(lambda: es.mle_mixing(cnt, pos, FWHM, C_bad, 6.25, 25.0, 9.0, 75.0))
+        self.assertEqual(len(w), 1)
+        self.assertTrue(issubclass(w[0].category, UserWarning))
+        _, w = self._warns(lambda: es.crb([5.0, -5.0], pos, FWHM, C_bad, 6.25, 25.0, 9.0, 100))
+        self.assertEqual(len(w), 1)
+        # umbral de condición: una C bien escalada pero con cond > 1e3 también avisa
+        C_cond = np.diag([1.0, 1.0, 1.0, 5e-4])
+        self.assertGreater(es.mixing_conditioning(C_cond, warn=False)[0], es.COND_MAX)
+        self.assertEqual(len(self._warns(lambda: es.mixing_conditioning(C_cond))[1]), 1)
+
+    def test_no_warning_for_measured_setup_and_sim_exp_emulation(self):
+        pos = psf.beam_positions(K, L, center=True)
+        for C, b, TT in [(mx.mixing_matrix(TAU, T, K, A, B, irf_fwhm=0.3), B, T),   # setup medido
+                         (C_MEAS, B, T),
+                         (mx.mixing_matrix(0.001, 25.0, K, 0.0, 6.25), 6.25, 25.0)]:  # sim_exp, IRF 0
+            (cond, smin), w = self._warns(lambda: es.mixing_conditioning(C))
+            self.assertEqual(w, [])
+            self.assertLess(cond, 2.0)
+            _, w = self._warns(lambda: es.crb([5.0, -5.0], pos, FWHM, C, b, TT, 21.0, 2095))
+            self.assertEqual(w, [])
+        # mle_legacy (C = I) nunca avisa
+        _, w = self._warns(lambda: es.mle_legacy(np.array([[500, 520, 480, 510]]), pos, FWHM,
+                                                 21.0, 75.0))
+        self.assertEqual(w, [])
+
+
 class TestCompare(unittest.TestCase):
 
     REQUIRED_EST = ("bias_x", "bias_y", "bias_abs", "sigma_x", "sigma_y", "rmse_2d", "rmse_over_crb")

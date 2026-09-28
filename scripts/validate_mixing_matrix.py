@@ -292,6 +292,40 @@ def _sweep_point(tag, seed, ntar, Ns, Nb, M_p, factor, tlife, b, lam_detect, pro
     return out
 
 
+def nb0_replica(procs, seed=20460928, n_target=2 * 10 ** 6):
+    """Réplica de ``variant_Nb0`` con otra semilla (R3: la original dio p = 0.0078).
+
+    Mismo setup que la variante sin fondo de ``main_validation`` (Ns = 2000, Nb = 0,
+    M_p = 2.2e6, factor 1.05, tau 4.21, [0, 10.1]); se compara contra la mezcla (tasa -> 0) y
+    contra la predicción exacta a tasa finita de sim_exp (``sim_exp_window_probs``, 'highest').
+    """
+    Ns, Nb, M_p, factor = 2000, 0, 2200000, 1.05
+    C = mx.mixing_matrix(TAU_NS, T_NS, K, A_NS, B_NS)
+    p_mix0 = mx.window_probs(LAM, C, B_NS, T_NS, Ns=Ns, Nb=0)
+    p_hi0 = mx.sim_exp_window_probs(LAM, Ns, Nb, Ns * factor, M_p, TAU_NS, T_NS, K, A_NS, B_NS,
+                                    rule="highest")
+    r0 = run_block("sin fondo, replica", seed, n_target, Ns, Nb, M_p, factor, procs=procs)
+    c0 = r0["counts"]
+    cm0, ch0 = _compare(c0, p_mix0), _compare(c0, p_hi0)
+    cn0 = _compare(c0, mx.naive_probs(LAM, float("inf")))
+    return {
+        "desc": "replica de variant_Nb0 con otra semilla base (mismo setup); no reemplaza a las "
+                "claves de aceptacion",
+        "Nb": 0, "Ns": Ns, "M_p": M_p, "factor": factor,
+        "n_detected_total": int(c0.sum()), "counts_observed": c0.tolist(),
+        "frac_observed": (c0 / c0.sum()).tolist(), "frac_mixing": p_mix0.tolist(),
+        "frac_sim_exp_highest_model": p_hi0.tolist(),
+        "chi2_mixing": cm0["chi2"], "chi2_pvalue_mixing": cm0["pvalue"],
+        "dev_se_mixing": cm0["dev_se"],
+        "chi2_pvalue_sim_exp_highest_model": ch0["pvalue"],
+        "dev_se_sim_exp_highest_model": ch0["dev_se"],
+        "chi2_pvalue_naive": cn0["pvalue"], "dev_se_naive": cn0["dev_se"],
+        "n_calls_ok": r0["n_calls_ok"], "n_calls_failed": r0["n_calls_failed"],
+        "per_call_chi2_mean": r0["per_call_chi2_mean"], "runtime_s": r0["runtime_s"],
+        "seed_base": r0["seed_base"], "script": "scripts/validate_mixing_matrix.py --only nb0-replica",
+    }
+
+
 def _dump(obj, name):
     path = os.path.join(ROOT, "results", name)
     os.makedirs(os.path.dirname(path), exist_ok=True)
@@ -302,7 +336,7 @@ def _dump(obj, name):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--only", choices=["main", "sweep"], default=None)
+    ap.add_argument("--only", choices=["main", "sweep", "nb0-replica"], default=None)
     ap.add_argument("--procs", type=int, default=4)
     ap.add_argument("--n-main", type=float, default=2e6)
     ap.add_argument("--quick", action="store_true", help="humo: pocas llamadas, no escribe")
@@ -312,6 +346,14 @@ def main():
         print(json.dumps({k: v[k] for k in ("n_detected_total", "rate_per_cycle",
                                             "chi2_pvalue_mixing_vs_sim_exp",
                                             "chi2_pvalue_naive_vs_sim_exp")}, indent=1))
+        return
+    if args.only == "nb0-replica":
+        # agrega results/mixing_validation.json:variant_Nb0_replica sin tocar las demás claves
+        path = os.path.join(ROOT, "results", "mixing_validation.json")
+        with open(path, encoding="utf-8") as fh:
+            prev = json.load(fh)
+        prev["variant_Nb0_replica"] = nb0_replica(args.procs)
+        _dump(prev, "mixing_validation.json")
         return
     if args.only in (None, "main"):
         _dump(main_validation(int(args.n_main), args.procs), "mixing_validation.json")

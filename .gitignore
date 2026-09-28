@@ -7,3 +7,10 @@ __pycache__/
 # --- /agent-team ---
 __pycache__/
 *.pyc
+
+# review/verify scratch clones and virtualenvs (large, reproducible)
+equipo/*/work/review/*/clone/
+equipo/*/work/review/*/venv*/
+equipo/*/work/**/venv*/
+*.egg-info/
+build/

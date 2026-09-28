@@ -6184,16 +6184,16 @@
   "sha256": {
    "mixing": "e3acbbd24c53c29201e7a8b779323bd3f3ca4080d61954775535e7c74c7c2f3e",
    "psf": "03b2d894ac2cecbab242b85ddeb2da41e135d978201dac05272bdb8a4d8831f1",
-   "estimate": "6c3f9591e77e6ed9b9b2fd7a025ae72c2c250558504f3c2120a7767974d7704c",
-   "simulate": "fb77ec32b390931c1b6747899a7bfb10b69bac50aadf3298aa6fad6b73df6761",
-   "windows": "458621e8d243bbeca43ca95b524fb42b199b7355e505ecbd9274e656b969e6db",
-   "study_misalignment_v2": "68f56d3c80e51ecf770b21cf123f39c68865721ba9b1323ba2e076c8bced0e11"
+   "estimate": "cae1f76cfb6b72746281e2f3dec30f9ea4bff03e5d1201fa72a9b9cdb7a8c01e",
+   "simulate": "db62f9e524ba4056e898506ebec44b67ed2a1a5ecce4feb8ce5aa1c38db2dcb5",
+   "windows": "fbf1d9d42570f90c8925ab119940bc1f86fe9211c35130c2d59de2069500222f",
+   "study_misalignment_v2": "abe88f21ab85461168a4a260261b3ee1b84b1eaa478f85e134bc8003a1d60af3"
   }
  },
  "command": "scripts/study_misalignment_v2.py",
  "runtime_s": {
-  "total": 45.44181180000305,
-  "simulation": 6.991982698440552,
-  "estimation": 36.43488574028015
+  "total": 40.71538543701172,
+  "simulation": 5.942694187164307,
+  "estimation": 32.85287880897522
  }
 }

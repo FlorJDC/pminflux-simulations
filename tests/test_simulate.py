@@ -407,6 +407,37 @@ class TestSimulateBlinking(unittest.TestCase):
         with self.assertRaises(ValueError):
             sm.simulate_counts(LAM55, 2, 10, math.inf, sm.SimParams(), _rng(1), t_mask=np.zeros(5))
 
+    def test_t_mask_sbr_reference(self):
+        # R3 (code-reviewer): con t_mask, sbr='on' se refiere a los ciclos encendidos (el SBR
+        # detectado baja con f_on); sbr_reference='total' reproduce el legado (Ns/Nb fijos del
+        # conjunto). Máscara 50 % en bloques de 1000 ciclos; 'none' para medir fracciones sin
+        # distorsión de tasa; sbr = 21.
+        M = 2000
+        mask = np.r_[np.ones(M // 2, bool), np.zeros(M // 2, bool)]
+        p = sm.SimParams(tcspc="none", rate_per_cycle=2.5e-3)
+        res = {}
+        for ref, seed in [("on", 81), ("total", 82)]:
+            _, tags = sm.simulate_counts(LAM55, 200, 1000, 21.0, p, _rng(seed), return_tags=True,
+                                         t_mask=mask, sbr_reference=ref)
+            f_bg = float(np.mean(tags["source"] == -1))
+            se = math.sqrt(f_bg * (1 - f_bg) / tags["source"].size)
+            res[ref] = (f_bg, se)
+        _log("sbr_reference", on=round(res["on"][0], 4), total=round(res["total"][0], 4),
+             ref_on=round(1 / (1 + 21 * 0.5), 4), ref_total=round(1 / 22., 4))
+        # 'on': fondo detectado = 1/(1 + sbr f_on) = 0.0870; 'total': 1/(1 + sbr) = 0.0455
+        self.assertLess(abs(res["on"][0] - 1 / (1 + 10.5)), 5 * res["on"][1] + 1.5e-3)
+        self.assertLess(abs(res["total"][0] - 1 / 22.), 5 * res["total"][1] + 1.5e-3)
+        # sin t_mask las dos referencias son idénticas bit a bit
+        c0 = sm.simulate_counts(LAM55, 20, 200, SBR21, sm.SimParams(), _rng(83))
+        c1 = sm.simulate_counts(LAM55, 20, 200, SBR21, sm.SimParams(), _rng(83),
+                                sbr_reference="total")
+        np.testing.assert_array_equal(c0, c1)
+        with self.assertRaises(ValueError):
+            sm.simulate_counts(LAM55, 2, 10, 5.0, sm.SimParams(), _rng(1), sbr_reference="x")
+        with self.assertRaises(ValueError):
+            sm.simulate_counts(LAM55, 2, 10, 5.0, sm.SimParams(), _rng(1), t_mask=np.zeros(5),
+                               sbr_reference="total")
+
 
 class TestSimulateSpeed(unittest.TestCase):
 

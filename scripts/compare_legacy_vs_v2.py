@@ -23,7 +23,6 @@ Uso (desde la raíz):  python scripts/compare_legacy_vs_v2.py [--source v2sim|mu
 
 import argparse
 import contextlib
-import hashlib
 import io
 import json
 import math
@@ -41,6 +40,8 @@ sys.path.insert(0, os.path.join(ROOT, "src"))
 from pminflux_sim import mixing as mx  # noqa: E402
 from pminflux_sim import psf  # noqa: E402
 from pminflux_sim import estimate as es  # noqa: E402
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from provenance_sha import sha256_file  # noqa: E402
 
 DEFAULT_OUT = os.path.join(ROOT, "results", "compare_legacy_vs_v2.json")
 POSITIONS = [(5.0, -5.0), (-5.07, -7.56), (20.0, 0.0), (-15.0, 15.0), (0.0, -30.0)]
@@ -55,11 +56,8 @@ F104_LEGACY_BIAS_SBR21 = [0.85, 1.51, 1.63, 2.69, 2.36]
 
 
 def _sha(path):
-    try:
-        with open(path, "rb") as fh:
-            return hashlib.sha256(fh.read()).hexdigest()
-    except IOError:
-        return None
+    """sha256 con fin de línea normalizado (CRLF -> LF): robusto a git autocrlf."""
+    return sha256_file(path)
 
 
 def _metrics(est, r0, crb_axis, idx=None):

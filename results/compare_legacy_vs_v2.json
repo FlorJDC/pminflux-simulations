@@ -2433,15 +2433,15 @@
   "sha256": {
    "mixing": "e3acbbd24c53c29201e7a8b779323bd3f3ca4080d61954775535e7c74c7c2f3e",
    "psf": "03b2d894ac2cecbab242b85ddeb2da41e135d978201dac05272bdb8a4d8831f1",
-   "estimate": "6c3f9591e77e6ed9b9b2fd7a025ae72c2c250558504f3c2120a7767974d7704c",
-   "simulate": "fb77ec32b390931c1b6747899a7bfb10b69bac50aadf3298aa6fad6b73df6761",
-   "compare_legacy_vs_v2": "8013b7932949c7fc9b81a593e7d537467c454ad966948dfda928bbdc72d84e2c"
+   "estimate": "cae1f76cfb6b72746281e2f3dec30f9ea4bff03e5d1201fa72a9b9cdb7a8c01e",
+   "simulate": "db62f9e524ba4056e898506ebec44b67ed2a1a5ecce4feb8ce5aa1c38db2dcb5",
+   "compare_legacy_vs_v2": "8de8d707bc08f2bcc4e3c3dd88cb10253f214c0f2ece348f6388eacba437267c"
   }
  },
  "command": "scripts/compare_legacy_vs_v2.py",
  "runtime_s": {
-  "total": 61.73311376571655,
-  "simulation": 42.92346501350403,
-  "estimation": 16.856911659240723
+  "total": 59.12987971305847,
+  "simulation": 41.082550048828125,
+  "estimation": 16.07725954055786
  }
 }

@@ -56,6 +56,7 @@ sesgos asintóticos).
 """
 
 import math
+import warnings
 
 import numpy as np
 from scipy import optimize, stats
@@ -64,8 +65,11 @@ from . import psf as _psf
 from .windows import check_overlap as _check_overlap
 
 __all__ = ["sbr_to_beta", "forward_probs", "legacy_probs", "neg_loglike", "mle_mixing",
-           "mle_legacy", "crb", "crb_legacy", "capture_fraction", "cov_ellipse", "MLEResult"]
+           "mle_legacy", "crb", "crb_legacy", "capture_fraction", "cov_ellipse", "MLEResult",
+           "mixing_conditioning", "COND_MAX", "SMIN_MIN"]
 
+COND_MAX = 1e3                 # C casi singular: número de condición > COND_MAX ...
+SMIN_MIN = 1e-2                # ... o valor singular mínimo < SMIN_MIN -> warnings.warn
 _P_FLOOR = 1e-300
 _BETA_MAX = 0.999
 _CHUNK = 20000                 # localizaciones por bloque en el arranque en grilla
@@ -90,6 +94,28 @@ def _as_C(C, K):
     if C.shape != (K, K):
         raise ValueError("C debe ser (K, K) con K = %d" % K)
     return C
+
+
+def mixing_conditioning(C, warn=True, stacklevel=3):
+    """Número de condición y valor singular mínimo de la matriz de mezcla ``C``.
+
+    Con ``warn=True`` emite ``warnings.warn`` (UserWarning) si ``C`` es casi singular
+    (``cond > COND_MAX = 1e3`` o ``s_min < SMIN_MIN = 1e-2``): las ventanas no separan los haces
+    (p. ej. IRF de 0.3 ns centrada en el pulso con tau ~ 0 y ``b = T/K``, que manda la mitad de
+    cada haz a la ventana anterior: al emular ``sim_exp`` hay que usar ``irf_fwhm=0``) y el MLE
+    y el CRB con esa C son inestables. ``mle_mixing`` y ``crb`` la llaman. Devuelve
+    ``(cond, s_min)``.
+    """
+    C = np.asarray(C, dtype=float)
+    sv = np.linalg.svd(C, compute_uv=False)
+    smin = float(sv.min())
+    cond = float(sv.max() / smin) if smin > 0 else float("inf")
+    if warn and (cond > COND_MAX or smin < SMIN_MIN):
+        warnings.warn("matriz de mezcla C casi singular (cond = %.3g, s_min = %.3g): las ventanas "
+                      "no separan los haces; revise tau, irf_fwhm, a, b (al emular sim_exp use "
+                      "irf_fwhm=0 y dead_time=0)" % (cond, smin), UserWarning,
+                      stacklevel=stacklevel)
+    return cond, smin
 
 
 def _logpow(powers, K):
@@ -492,6 +518,7 @@ def mle_mixing(counts, pos, fwhm, C, b, T, sbr, bounds_radius, center=(0.0, 0.0)
     if C is None:
         raise ValueError("mle_mixing necesita C (use mle_legacy para el modelo sin fuga)")
     _check_overlap(b, T, np.asarray(pos).shape[0], allow_overlap)
+    mixing_conditioning(_as_C(C, np.asarray(pos).shape[0]))
     return _mle_core(counts, pos, fwhm, C, b / float(T), sbr, bounds_radius, center, powers,
                      free_bg, free_powers, kind, x0, grid_step, maxiter, chunk)
 
@@ -533,6 +560,8 @@ def crb(r, pos, fwhm, C, b, T, sbr, N, powers=None, free_bg=False, free_powers=F
     n = r2.shape[0]
     pos = np.asarray(pos, dtype=float)
     K = pos.shape[0]
+    if C is not None:
+        mixing_conditioning(_as_C(C, K))
     model = _Model(pos, fwhm, C, b / float(T), kind)
     beta = np.full(n, sbr_to_beta(sbr))
     lp = _logpow(powers, K)

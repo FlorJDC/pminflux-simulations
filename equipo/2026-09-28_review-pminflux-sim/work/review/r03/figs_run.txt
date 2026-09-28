@@ -1,0 +1,7 @@
+escrito timeline_20MHz.png
+escrito mixing_validation.png
+escrito rate_sweep.png
+escrito legacy_vs_v2.png
+escrito f201_leakage.png
+escrito dead_time_sweep.png
+escrito captions.json (6 figuras)

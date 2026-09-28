@@ -1,0 +1,2 @@
+report/index.html: 803125 bytes, 93 entradas de procedencia, 11 secciones
+placeholders: resultados de study_v2.json (pendientes de verificación)

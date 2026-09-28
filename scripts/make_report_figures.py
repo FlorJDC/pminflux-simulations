@@ -14,6 +14,7 @@ Uso:  python scripts/make_report_figures.py
 from __future__ import print_function
 
 import json
+import math
 import os
 import re
 import sys
@@ -75,6 +76,7 @@ def fig_timeline():
     dT = T / K
     sig = mixing.fwhm_to_sigma(irf)
     C = mixing.mixing_matrix(tau, T, K, a, b, irf_fwhm=None)
+    C_irf = mixing.mixing_matrix(tau, T, K, a, b, irf_fwhm=irf)   # la IRF dibujada (R3)
     C_st = mixing.mixing_matrix(0.001, T, K, 0.0, 12.5, irf_fwhm=None)
     c10 = C[1, 0]
     t = np.linspace(0, T, 5001)
@@ -144,11 +146,12 @@ def fig_timeline():
          "K = 4 pulsos cada 12.5 ns. Arriba, el setup medido: decaimiento exponencial τ = 4.21 ns con "
          "IRF gaussiana de 0.3 ns FWHM (recuadro) y ventanas [i·12.5, i·12.5 + 10.1] ns. La cola del "
          "haz 0 (rayado) cae dentro de la ventana 1: C[1][0] = %.4f, es decir un %.1f %% de los fotones "
-         "del haz 0 se cuentan como del haz 1 (C[i][i] = %.4f). Abajo, el supuesto de los estudios "
+         "del haz 0 se cuentan como del haz 1. C[i][i] = %.4f con la IRF de 0.3 ns dibujada (%.4f sin IRF; "
+         "C[1][0] es %.4f en los dos casos). Abajo, el supuesto de los estudios "
          "legados (Tlife = 0.001 ns, b = 12.5 ns): los pulsos son instantáneos y la fuga es nula. Si "
          "se simula así, el estudio no puede ver el desajuste del estimador sin fuga (el \"crimen "
-         "inverso\" F104+F201). C sin IRF, igual a results/mixing_validation.json:C_no_irf."
-         % (c10, 100 * c10, C[0, 0]),
+         "inverso\" F104+F201). La C sin IRF es igual a results/mixing_validation.json:C_no_irf."
+         % (c10, 100 * c10, C_irf[0, 0], C[0, 0], C_irf[1, 0]),
          "results/mixing_validation.json:C_no_irf (recalculado con pminflux_sim.mixing.mixing_matrix)")
     return C
 
@@ -257,13 +260,14 @@ def fig_rate_sweep():
     ax.set_yscale("log")
     ax.set_xlabel("tasa detectada (fotones por ciclo TCSPC)")
     ax.set_ylabel("máx. |desvío| vs mezcla\n(SE por localización de 2000 fotones)")
-    ax.set_title("Desvío de sim_exp respecto del modelo de mezcla en función de la tasa", loc="left")
+    ax.set_title("Desvío predicho de sim_exp respecto del modelo de mezcla en función de la tasa",
+                 loc="left")
     ax.legend(loc="lower right", frameon=True, framealpha=0.95, fontsize=7.8)
     ax.set_ylim(1e-3, 20)
     fig.subplots_adjust(left=0.12, right=0.98, top=0.91, bottom=0.14)
     i1 = int(np.argmin(np.abs(r - 1e-3)))
     i3 = int(np.argmin(np.abs(r - 3e-3)))
-    save(fig, "rate_sweep.png", "Desvío por tasa finita: 'highest' y 'earliest' frente a la mezcla",
+    save(fig, "rate_sweep.png", "Desvío predicho por tasa finita: 'highest' y 'earliest' frente a la mezcla",
          "Máximo sobre las 4 ventanas del desvío predicho (exacto a tasa finita, pminflux_sim.mixing) "
          "entre las fracciones por ventana y el modelo de mezcla (tasa → 0), en SE de una localización "
          "de 2000 fotones, frente a la tasa por ciclo (Ns 2000, Nb 200, λ = [0.12, 0.28, 0.35, 0.25], "
@@ -461,11 +465,11 @@ def fig_dead_time():
          "para 'highest' (emulación de sim_exp). El tiempo muerto de 22 ns es un SUPUESTO (valor típico "
          "de SPAD), no un valor medido. Con d = n·T (50 y 100 ns) el sesgo se anula exactamente "
          "(resultado demostrado y verificado): %.3f–%.3f y %.3f–%.3f SE, dentro del ruido de MC "
-         "(franja gris, 2·SE_MC ≈ %.3f; p del χ² contra la mezcla ≥ %.2f). Con d = 22 ns: %.3f SE a 1e-3, %.3f a 5.5e-3 y %.3f a 0.0105 "
+         "(franja gris, 2·SE_MC ≈ %.3f; p del χ² contra la mezcla ≥ %.2f, mínimo %.3f). Con d = 22 ns: %.3f SE a 1e-3, %.3f a 5.5e-3 y %.3f a 0.0105 "
          "fotones/ciclo. Conclusión: en el régimen de tracking el sesgo por tasa finita es ≤0.08 SE por "
          "localización."
          % (d["params"]["n_loc_per_case"], d["params"]["seed"], min(v50.values()), max(v50.values()),
-            min(v100.values()), max(v100.values()), 2 * mcse, pmin_nT, v22[0.001], v22[0.0055], v22[0.0105]),
+            min(v100.values()), max(v100.values()), 2 * mcse, math.floor(pmin_nT * 100) / 100.0, pmin_nT, v22[0.001], v22[0.0055], v22[0.0105]),
          "results/dead_time_sweep.json:rows[*].max_abs_bias_SE_per_loc,rows[*].mc_se_in_SE_per_loc,"
          "assumptions")
 
