@@ -1,0 +1,212 @@
+[
+ {
+  "item": 1,
+  "pregunta": "Normalizacion de la dona explicita (pico del anillo = 1 o misma potencia que la gaussiana) y zero offset / epsilon referido al mismo pico (factor e).",
+  "estado": "aplica-ok",
+  "evidencia": "doughnut() usa el prefactor 4e*ln2 y lo documenta: pico del anillo = 1.000000 (en r = 206.53 nm con fwhm 343.9), potencia = e = 2.7183 veces la de la gaussiana; la convencion SimuFLUX da pico 1/e = 0.367879. El pedestal de realistic_ebp (pedestal + amplitude*dona de pico 1) y zero_ratio = min/max del mapa quedan referidos al pico del anillo, igual que el '< 0.2 %' de Balzarotti con el que se comparan. En la grilla de 400 nm el maximo del mapa de la dona ideal es el pico del anillo (1.000000), asi que zero_ratio no queda truncado por el FOV.",
+  "legacy_location": "legacy/p-minflux-main/tools/tools_simulations.py:130-158 (doughnut, beta = 2e, l.155); legacy/p-minflux-main/tools/realistic_ebp.py:55-89 (donut_2d), 100-103; legacy/p-minflux-main/tools/ebp.py:578 (zero_ratio); legacy/p-minflux-main/simulation_misalignment.py:124-126",
+  "ref_finding_or_script": "scripts/findings/C01_donut_normalization_factor_e.py",
+  "numero": "factor e = 2.7183; pedestal/pico del anillo = 0.103/0.129/0.154/0.128 -> zerooffset SimuFLUX equivalente 0.038/0.048/0.057/0.047; zero_ratio 9.0-11.0 % -> 0.032-0.041 en convencion SimuFLUX; el 0.01 de SimuFLUX SI Fig. 5 = 2.72 % del pico del anillo",
+  "nota": "Correcto y consistente con Balzarotti. El docstring de doughnut (l.139-142) cita SimuFLUX por como entra el fwhm, que es correcto, pero no advierte que PsfDonut2D no lleva el factor e (pico del anillo 1/e). No afecta a p_i (l.150-152), pero para comparar su pedestal con el zerooffset de SimuFLUX hay que dividir por e: su cero es ~3.8-5.7 veces el 0.01 que usa SimuFLUX."
+ },
+ {
+  "item": 2,
+  "pregunta": "El cero imperfecto esta en el modelo Y en el estimador (si solo esta en los datos hay sesgo).",
+  "estado": "aplica-ok",
+  "evidencia": "En los casos 'honestos' la misma PSF (con su pedestal: 'exp' y 'realistic_fit') genera los fotones y la usa el estimador; en los 'ingenuos' el estimador supone el EBP ideal a proposito, y el script lo rotula y reporta el sesgo resultante. NOTAS_Simulacion.txt (N = 2095, 1000 muestras): Experimental honesta |b| = 0.12 +- 0.09 nm, RMSE/CRB 0.99; Experimental ingenua |b| = 62.76 nm, RMSE/CRB 23.45. La comparacion es justa: misma semilla, r0, SBR y radio de busqueda (F290-D7, verificado).",
+  "legacy_location": "legacy/p-minflux-main/simulation_misalignment.py:18-23, 161-175, 199-225; legacy/p-minflux-main/Resultados/Data_20260820_N2000_SBR20/NOTAS_Simulacion.txt",
+  "ref_finding_or_script": "F290-D7 (discarded-verified); NOTAS_Simulacion.txt",
+  "numero": "honesta |b| 0.12 nm / RMSE/CRB 0.99 vs ingenua |b| 62.76 nm / RMSE/CRB 23.45",
+  "nota": "Es exactamente el diseno que recomienda [MR]. Dos matices ya verificados que no son el cero: la fuga entre pulsos (otra imperfeccion 'en los datos y no en el estimador') esta apagada en los estudios (F201) y el estimador de la Ec. 3.5 no la describe (F104); realistic_ebp descarta la potencia relativa de los haces (F202, item 8)."
+ },
+ {
+  "item": 3,
+  "pregunta": "Fondo fisico constante por exposicion (proporcional a potencia y dwell) o SBR fija (fondo que depende de la posicion)? Baja la SBR al achicar L (S32)?",
+  "estado": "falla",
+  "evidencia": "El legado fija Ns y Nb (sim_exp) y usa una SBR unica en toda la grilla: lambda_b es constante en crb_minflux y p = s*PSF/sum + (1-s)/K en pos_MINFLUX, o sea un fondo que escala con la senal local S(r) = sum_i I_i(r). Con un fondo constante por exposicion, en el EBP ideal de los estudios (L_eff 103.23, fwhm 343.9) S(r)/S(0) va de 1.000 a 2.106 dentro de |r| <= L/2 (SBR 21.05 -> 44.3) y llega a 4.69 en |r| = L. Pero a SBR 21 el CRB casi no cambia: cociente fondo constante / SBR fija = 0.984-0.999 en |r| <= L/2 (0.981 en |r| = L). La SBR en el centro cae como ~L^2 al achicar L (S(0;50)/S(0;103.23) = 0.246, ley L^2 0.235), pero el legado no barre L, asi que S32 no entra en ningun resultado. Validacion: el CRB propio con SBR fija reproduce ts.crb_minflux (0.8684 vs 0.8689 nm en (5,-5)).",
+  "legacy_location": "legacy/p-minflux-main/tools/tools_simulations.py:533-566 (Ns/Nb fijos, fondo uniforme l.559-566), :649-653 (lambda_b constante), :1041 (p de pos_MINFLUX); legacy/p-minflux-main/simulation_misalignment.py:50-52, 187-192, 340-359 (mapas de CRB con SBR fija)",
+  "ref_finding_or_script": "scripts/findings/C03_fixed_sbr_vs_constant_background.py",
+  "numero": "S(r)/S(0) = 1.000-2.106 en |r| <= L/2; CRB_fondo/CRB_fija = 0.984-0.999 (SBR 21); S(0;L=50)/S(0;103.23) = 0.246",
+  "nota": "Falla de convencion con impacto numerico despreciable en los estudios: cada Monte Carlo usa una sola posicion (donde la SBR es solo un parametro) y en los mapas de CRB el cambio es <= 1.6 % dentro de |r| <= L/2. Pesaria con SBR baja o si se barriera L con potencia fija. Al pie de la letra, lo que el legado llama 'SBR' es la SBR en la posicion del emisor."
+ },
+ {
+  "item": 4,
+  "pregunta": "El estimador conoce, resta o ajusta el fondo?",
+  "estado": "aplica-ok",
+  "evidencia": "pos_MINFLUX recibe la SBR verdadera y modela el fondo como 1/K por ventana; con b = dt/K eso es exactamente lo que deposita sim_exp (F152: el fondo aporta Nb*b/T por ventana, verificado; F290-D4: las fracciones por ventana de sim_exp coinciden con el modelo 1/K, 628 500 fotones, |z| <= 1.3). No hay sesgo por fondo ignorado en los estudios.",
+  "legacy_location": "legacy/p-minflux-main/tools/tools_simulations.py:1002-1041 (p con SBR), :559-566; legacy/p-minflux-main/simulation_misalignment.py:222-223; legacy/p-minflux-main/documento/make_fig_eficiencia.py:118-119",
+  "ref_finding_or_script": "F152, F290-D4 (discarded-verified); F104 (verified)",
+  "numero": "|z| <= 1.3 (fracciones por ventana contra el modelo 1/K, 628 500 fotones)",
+  "nota": "La SBR es un oraculo: el estimador la conoce exacta, no la estima (optimista frente al experimento, pero no es el error del item). Con ventanas b < T/K el fondo real por ventana es Nb*b/T y el modelo 1/K deja de valer (F104, latente en los estudios porque usan b = dt/K)."
+ },
+ {
+  "item": 5,
+  "pregunta": "Pinhole comun a todas las exposiciones (EOD no des-escaneado); deteccion centrada en el patron?",
+  "estado": "no aplica",
+  "evidencia": "El legado no modela la deteccion: p_i sale solo de las PSFs de excitacion (PSF_i/sum PSF), lo que equivale a una eficiencia de deteccion uniforme y comun a todos los haces. No hay una deteccion por exposicion que pueda quedar mal centrada.",
+  "legacy_location": "legacy/p-minflux-main/tools/tools_simulations.py:444-449 (lambda = psf[i, r0]), :1036-1041",
+  "ref_finding_or_script": null,
+  "numero": null,
+  "nota": "El limite implicito (deteccion uniforme y comun) es el que [MR] encuentra benigno: un pinhole desalineado hasta 400 nm da STD/CRB 0.9-1.1. No se puede comprobar desde el codigo si las PSFs medidas llevan una deteccion por haz."
+ },
+ {
+  "item": 6,
+  "pregunta": "Se distingue la desalineacion de la mascara de fase (deforma la dona) del error de posicion del patron? Dependencia con z?",
+  "estado": "aplica-ok",
+  "evidencia": "La escalera de EBPs separa las dos cosas: 'geom_exp' pone donas perfectas en las posiciones medidas (solo geometria) y 'exp'/'realistic_fit' agrega la forma real. En NOTAS_Simulacion.txt la geometria sola da |b| 0.38 nm con el estimador ingenuo (RMSE/CRB 1.06) y la forma da 62.76 nm: la conclusion 'domina la forma (profundidad del cero), no la geometria' sale de esa separacion.",
+  "legacy_location": "legacy/p-minflux-main/simulation_misalignment.py:9-16, 132-147, 161-175; legacy/p-minflux-main/ESTADO_Y_PLAN_REALISMO_PSF.md:20-27",
+  "ref_finding_or_script": "NOTAS_Simulacion.txt; F290-D7",
+  "numero": "geometria sola |b| 0.38 nm (RMSE/CRB 1.06) vs forma medida |b| 62.76 nm (RMSE/CRB 23.45)",
+  "nota": "Parcial: todo es 2D en un solo plano focal; no se considera z ni el desenfoque, donde [MR] SI Fig. 1 ve el sesgo mas grande (hasta ~-50 nm fuera de foco)."
+ },
+ {
+  "item": 7,
+  "pregunta": "Si se calibra con esferas, se tuvo en cuenta que su tamano llena el cero?",
+  "estado": "aplica-ok",
+  "evidencia": "La autora identifica el efecto (docstring de fit_donut_fwhm; documento con cita a [MR]; plan de convolucionar con la perla) pero no lo corrige. Con la perla de 20 nm de la calibracion 20260820, una esfera uniforme sobre la dona (fwhm 343.9) llena el cero hasta 0.255 % del pico del anillo (analitico 0.255 %), o sea 2.3-2.9 % del zero_ratio medido (8.7-11.0 %). La perla no explica el cero medido; con 100 nm explicaria 56-71 %.",
+  "legacy_location": "legacy/p-minflux-main/tools/ebp.py:545-549; legacy/p-minflux-main/documento/build_doc.py:684-691; legacy/p-minflux-main/ESTADO_Y_PLAN_REALISMO_PSF.md:31, 118",
+  "ref_finding_or_script": "scripts/findings/C07_bead_fills_zero.py",
+  "numero": "perla 20 nm: 0.255 % del pico del anillo = 2.3-2.9 % del cero medido",
+  "nota": "Aplica-ok porque la advertencia es correcta y, con 20 nm, la correccion no cambia la conclusion 'domina la profundidad del cero'. Supuestos: dona 2D sin dependencia en z, perla uniforme, tamano segun ESTADO_Y_PLAN (sin verificar contra el cuaderno del experimento)."
+ },
+ {
+  "item": 8,
+  "pregunta": "Dwell times y pesos por exposicion reales (ctrDwellFactor, CFR normalizado por dwell)?",
+  "estado": "falla",
+  "evidencia": "Los dwells son los reales de p-MINFLUX: un pulso por haz y por ciclo, tau_i = i*dt/K y ventanas b = dt/K de igual peso; no hay CFR. Pero el peso de cada exposicion tambien es la potencia del haz, y realistic_ebp normaliza cada PSF por su propio maximo y descarta intensity_scale (F202, verificado): si el maximo del .npy refleja la potencia, p_senal en el emisor pasa de [0.111, 0.262, 0.314, 0.313] a [0.111, 0.207, 0.342, 0.340] y el estimador realista sin potencias queda sesgado 10.6 nm. El EBP 'exp' conserva las escalas crudas.",
+  "legacy_location": "legacy/p-minflux-main/tools/realistic_ebp.py:100-103, 152, 181-185; legacy/p-minflux-main/simulation_misalignment.py:99-100",
+  "ref_finding_or_script": "F202 (verified)",
+  "numero": "sesgo 10.6 nm (asintotico 10.60, MC 10.65); intensity_scale max/min 1.379",
+  "nota": "Condicionado al supuesto de F202 (el maximo de cada .npy refleja la potencia relativa del haz), que falta confirmar con la autora. El dwell por exposicion esta bien modelado."
+ },
+ {
+  "item": 9,
+  "pregunta": "N fijo (multinomial) o Poisson con umbral de fotones? Senal y fondo por separado?",
+  "estado": "aplica-ok",
+  "evidencia": "Ns y Nb son parametros explicitos, fijos y declarados (2000/95; en la eficiencia Ns = round(SBR/(SBR+1)*N)), y los scripts los imprimen por separado. Fijar Ns y Nb exactos, en lugar de Mult(N, p), hace la sigma del MLE solo 0-0.71 % menor que el CRB multinomial (F105, descartado y verificado).",
+  "legacy_location": "legacy/p-minflux-main/tools/tools_simulations.py:533-566; legacy/p-minflux-main/simulation_misalignment.py:50-52; legacy/p-minflux-main/documento/make_fig_eficiencia.py:100-101",
+  "ref_finding_or_script": "F105 (discarded-verified)",
+  "numero": "sigma(Ns, Nb fijos)/CRB multinomial = 0.993-1.000 (0-0.71 % menor)",
+  "nota": "No hay umbral de fotones ni conteos Poisson; la propia autora anota que convendria sortear Ns y Nb Poisson (ESTADO_Y_PLAN_REALISMO_PSF.md:114-117)."
+ },
+ {
+  "item": 10,
+  "pregunta": "Filtros reales (CFR, umbral de fondo, stickiness)? Fraccion de localizaciones validas y sesgo de seleccion?",
+  "estado": "no aplica",
+  "evidencia": "No hay esquema iterativo ni filtros: todas las localizaciones se usan. Lo unico que se descarta son las simulaciones fallidas de sim_exp, que se cuentan ('fails'); en los estudios no ocurren (0/300 con Ns = 2000; margen minimo de ciclos 3/55/76/105 para Ns = 90/1440/2000/2880, F290-D1).",
+  "legacy_location": "legacy/p-minflux-main/simulation_misalignment.py:210-226; legacy/p-minflux-main/documento/make_fig_eficiencia.py:110-119",
+  "ref_finding_or_script": "F290-D1 (discarded-verified)",
+  "numero": "0/300 fallas con Ns = 2000",
+  "nota": "El radio de busqueda (R = 0.75 L) no filtra pero actua como un prior duro; su efecto es el item 13 (F203)."
+ },
+ {
+  "item": 11,
+  "pregunta": "Estimador linealizado usado fuera de su rango (|x| >~ L/4)?",
+  "estado": "no aplica",
+  "evidencia": "El legado solo usa el MLE sobre grilla (pos_MINFLUX; tambien tools_analysis.pos_minflux y el MLE sobre el mismo mapa de analyze_realistic_psf.py). No hay ningun estimador LSQ/LMS linealizado; least_squares solo aparece en el ajuste de las PSFs (realistic_ebp.py:140).",
+  "legacy_location": "legacy/p-minflux-main/tools/tools_simulations.py:1002-1110; legacy/p-minflux-main/tools/tools_analysis.py:434-483; legacy/p-minflux-main/analyze_realistic_psf.py:66-88",
+  "ref_finding_or_script": null,
+  "numero": null,
+  "nota": "El MLE sobre grilla tiene sus propios problemas, ya verificados: cuantizacion y emisor pegado al nodo (F106) y dependencia del radio de busqueda (F203)."
+ },
+ {
+  "item": 12,
+  "pregunta": "Se reportan sesgo, STD y RMSE con el estimador realmente usado, y no solo el CRB?",
+  "estado": "aplica-ok",
+  "evidencia": "Cada caso reporta std_x, std_y, |sesgo|, RMSE y RMSE/CRB con el MLE que se usa, con errores estandar y semilla fija; el documento explica que el CRB no ve el sesgo del modelo mal especificado. NOTAS_Simulacion.txt: Experimental ingenua std 4.30/21.28, |b| 62.76, RMSE 46.96, RMSE/CRB 23.45 nm.",
+  "legacy_location": "legacy/p-minflux-main/simulation_misalignment.py:226-241, 263-281; legacy/p-minflux-main/documento/make_fig_eficiencia.py:125-131; legacy/p-minflux-main/documento/build_doc.py:502-526",
+  "ref_finding_or_script": "NOTAS_Simulacion.txt; F205, F204 (verified)",
+  "numero": "RMSE/CRB 23.45 con |b| 62.76 nm (Experimental ingenua)",
+  "nota": "Hace lo que el item pide. Hay defectos de ejecucion ya verificados: el sesgo se mide contra R0 = (-5.07,-7.56) y no contra el pixel simulado (-5,-8): 0.43 contra 0.02 nm (F205). Los SE suponen normalidad: con N = 100 el SE real de RMSE/CRB es 1.6-1.9 veces el impreso (F204)."
+ },
+ {
+  "item": 13,
+  "pregunta": "MLE evaluado con pocos fotones? Se reportan el disco de busqueda y la eleccion de raiz?",
+  "estado": "falla",
+  "evidencia": "Credito: evalua N = 100-3200 (eficiencia.log: con N = 100 el experimental da RMSE/CRB 1.89 y |b| 4.14 nm) y declara el radio de busqueda (77.4 nm = 0.75 L_eff). Falla: no reporta la fraccion de estimaciones en el borde ni la dependencia con R, y los resultados dependen de R (F203, verificado): Realista ingenua (N = 2095) RMSE 12.1/13.2/50.0/81.9 nm, con el 0/1/50/87 % en el borde, para R = 0.5/0.75/1.0/1.25 L. Con N = 100 hasta el honesto realista depende de R (12-26 nm).",
+  "legacy_location": "legacy/p-minflux-main/simulation_misalignment.py:69-75, 178, 222-223; legacy/p-minflux-main/documento/make_fig_eficiencia.py:44, 89, 118-119; legacy/p-minflux-main/documento/eficiencia.log",
+  "ref_finding_or_script": "F203 (verified)",
+  "numero": "RMSE 12.1 -> 81.9 nm al pasar R de 0.5 a 1.25 L (Realista ingenua); honesto con N = 100: 12-26 nm",
+  "nota": "La eleccion de raiz 1D no aplica (2D, K = 4 con centro)."
+ },
+ {
+  "item": 14,
+  "pregunta": "fwhm/sigma del estimador coincide con la PSF real? (convencion x1.2, default 360 vs 310)",
+  "estado": "aplica-ok",
+  "evidencia": "DONUT_FWHM = None: el fwhm se ajusta a las donas medidas (343.9 nm, run_final.log:3) y ese mismo valor genera los EBP analiticos y los usa el estimador, asi que en los casos honestos el desajuste es 0 por construccion. La convencion x1.2 de sml-ssi esta documentada y corregida (fwhm_literatura = 1.2 * fwhm_sml-ssi). Cuanto costaria no hacerlo (sesgo asintotico del MLE continuo, SBR 21, 4 posiciones): estimador con el default 360 sobre datos de 343.9 <= 0.044 nm (0.04 CRB); confundir la convencion (360/432) <= 0.147 nm (0.15 CRB); fwhm del ajuste 2D (399.3) contra el radial (343.9) <= 0.127 nm.",
+  "legacy_location": "legacy/p-minflux-main/tools/tools_simulations.py:18-39; legacy/p-minflux-main/simulation_misalignment.py:81-90, 114-118, 133-136; legacy/p-minflux-main/documento/make_fig_eficiencia.py:69-71",
+  "ref_finding_or_script": "scripts/findings/C14_estimator_fwhm_mismatch.py",
+  "numero": "desajuste 0 en los honestos; 343.9/360: max |b| 0.044 nm; 360/432: 0.147 nm; 399.3/343.9: 0.127 nm",
+  "nota": "Con L ~ 103 nm << fwhm el MLE es poco sensible al fwhm, que entra a 4.o orden cerca del cero; el aviso de [MR] pesa mas para el LSQ linealizado, donde el fwhm entra en el prefactor. Lateral: el ajuste radial (343.9) y el 2D (shared_fwhm 399.3, elipticos 279-511) no coinciden; el desajuste de tamano explica <= 0.13 nm de los ~5.4 nm de 'Realista ingenua'."
+ },
+ {
+  "item": 15,
+  "pregunta": "El RMSE lleva la raiz? Error por eje o promediado sobre ejes? Coincide con la convencion del CRB?",
+  "estado": "aplica-ok",
+  "evidencia": "RMSE = sqrt(0.5*(sx^2 + sy^2 + bx^2 + by^2)), con raiz y promediado por eje; el CRB es sqrt(tr Sigma / 2) = sqrt(1/(dN))*sqrt(E/F), y la autora lo valida en el documento (sec. 4.2: coincide con la traza a 1e-9; escala 1/sqrt(N)). crb_minflux (metodo 1, px = 1) coincide con un Fisher continuo independiente dentro de 4.4e-4 nm (F151, verificado).",
+  "legacy_location": "legacy/p-minflux-main/simulation_misalignment.py:231-232; legacy/p-minflux-main/documento/make_fig_eficiencia.py:125; legacy/p-minflux-main/tools/tools_simulations.py:698; legacy/p-minflux-main/documento/build_doc.py:481-491; legacy/p-minflux-main/analyze_realistic_psf.py:88",
+  "ref_finding_or_script": "F151 (discarded-verified); F203 (verified, metrica mezclada)",
+  "numero": "crb_minflux vs Fisher continuo: <= 4.4e-4 nm",
+  "nota": "RMSE/CRB es coherente. Lo que se mezcla es la tabla: |sesgo| es la norma 2D y RMSE va por eje, de ahi que |b| = 62.76 > RMSE = 46.96 en el log (F203). Leidos igual, |b|/sqrt(2) = 44.4 < 46.96."
+ },
+ {
+  "item": 16,
+  "pregunta": "En el cero exacto sin fondo, el CRB es el valor puntual o el limite? Cambia con un regularizador o con el paso de diferencias finitas?",
+  "estado": "aplica-ok",
+  "evidencia": "crb_minflux (np.gradient con paso de 1 px, sin regularizador) en el pixel central del EBP ideal: con la SBR de los estudios (21.05) es continuo, 0.8863 nm en r = 0 contra 0.8848 en los vecinos a 1 nm; un Fisher continuo propio da 0.8858 en r = 0 y en el limite. Solo con SBR -> inf aparece la discontinuidad: con SBR 1e12 el valor puntual es 0.8509 (legado) / 0.8505 (continuo) y el limite es 0.7496 nm (13.5 % menor), porque en r = 0 se pierde la informacion del haz central (0/0). SBR = inf da NaN (F110), no un numero equivocado.",
+  "legacy_location": "legacy/p-minflux-main/tools/tools_simulations.py:583-698 (metodo 1), :649-653",
+  "ref_finding_or_script": "scripts/findings/C16_crb_at_exact_zero.py; F110, F151",
+  "numero": "SBR 21: 0.8863 (r = 0) vs 0.8848 nm (1 nm); SBR 1e12: punto 0.8509 vs limite 0.7496 nm",
+  "nota": "Los estudios nunca evaluan r = 0 exacto sin fondo (r0 = (5,-5) o (-5,-8), siempre SBR finita), asi que no hay problema en los numeros. Sin regularizador tipo p_i + 1e-4 (SimuFLUX), el valor no depende de una constante arbitraria."
+ },
+ {
+  "item": 17,
+  "pregunta": "Primera iteracion / busqueda realista (creeping); error de la iteracion k vs CRB centrado.",
+  "estado": "no aplica",
+  "evidencia": "No hay esquema iterativo ni busqueda: el patron esta fijo y centrado en el origen, el emisor a ~10 nm del centro, y el MLE busca en un disco fijo alrededor del patron.",
+  "legacy_location": "legacy/p-minflux-main/simulation_misalignment.py:66-75, 213-224",
+  "ref_finding_or_script": null,
+  "numero": null,
+  "nota": "Fuera de alcance: se simula una localizacion estatica de p-MINFLUX, no el lazo de un MINFLUX iterativo."
+ },
+ {
+  "item": 18,
+  "pregunta": "Potencia y SBR cambian entre iteraciones como en el instrumento?",
+  "estado": "no aplica",
+  "evidencia": "Sin iteraciones: una sola L (L_eff 103.23 nm), una sola potencia y una SBR fija por estudio.",
+  "legacy_location": "legacy/p-minflux-main/simulation_misalignment.py:50-52, 130; legacy/p-minflux-main/documento/make_fig_eficiencia.py:42",
+  "ref_finding_or_script": null,
+  "numero": null,
+  "nota": "Fuera de alcance. Si se extiende a L variable, ver el item 3: con potencia fija la SBR cae ~L^2 (C03)."
+ },
+ {
+  "item": 19,
+  "pregunta": "Hay parpadeo en la escala del barrido del patron? (sigma_fl independiente de N)",
+  "estado": "aplica-ok",
+  "evidencia": "Los estudios no incluyen parpadeo (t_mask = None; ademas la ruta 'p_minflux' lo ignoraria en silencio, F107, verificado: 51.35 % de los fotones en la mitad apagada). Para p-MINFLUX la omision esta justificada: el patron se barre cada 50 ns (haces cada 12.5 ns), asi que el parpadeo expone a los 4 haces casi por igual. Con parpadeo telegrafico t_on = t_off = 100 us y 2e5 ciclos, sigma_fl = 6.6e-4 nm = 7.6e-4 sigma_CRB (1 us: 7.1e-3 sigma_CRB). Con exposiciones secuenciales tipo SimuFLUX (4 x 100 us) seria 2.67 nm = 3.1 sigma_CRB.",
+  "legacy_location": "legacy/p-minflux-main/tools/tools_simulations.py:454-466, 473-491 (t_mask solo fuera de la ruta rapida); legacy/p-minflux-main/simulation_misalignment.py:217",
+  "ref_finding_or_script": "scripts/findings/C19_blinking_vs_pattern_period.py; F107 (verified)",
+  "numero": "p-MINFLUX: sigma_fl/sigma_CRB = 7.6e-4 (100 us) y 7.1e-3 (1 us); secuencial 4x100 us: 3.1",
+  "nota": "Solo cuenta el desbalance de exposicion entre haces, propagado linealmente; no cubre el parpadeo que cambia la tasa total (eso afecta el tiempo, no p_i). El riesgo real es F107: la opcion de parpadeo existe pero no funciona en la ruta p_minflux."
+ },
+ {
+  "item": 20,
+  "pregunta": "Blanqueo (restando fotones emitidos antes del pinhole) y densidad de emisores activos (vecino a ~50 nm)?",
+  "estado": "no aplica",
+  "evidencia": "Un solo emisor con presupuesto fijo Ns por localizacion: no se simulan blanqueo ni vecinos.",
+  "legacy_location": "legacy/p-minflux-main/tools/tools_simulations.py:298-566 (sim_exp: un emisor en r0)",
+  "ref_finding_or_script": null,
+  "numero": null,
+  "nota": "Fuera de alcance: el estudio es precision y sesgo de una localizacion aislada. Con Ns fijo, el blanqueo durante la localizacion solo recorta el presupuesto."
+ },
+ {
+  "item": 21,
+  "pregunta": "El emisor se mueve durante la medicion (difusion/vibracion, dt < dwell)? Tiempos muertos del hardware si se simula tracking?",
+  "estado": "no aplica",
+  "evidencia": "Emisor estatico (lambda leido en un pixel fijo) y sin simulacion de tracking ni de los tiempos muertos del EOD o el galvo.",
+  "legacy_location": "legacy/p-minflux-main/tools/tools_simulations.py:444-449",
+  "ref_finding_or_script": "F101 (verified; relacionado, no es este item)",
+  "numero": "F101: <= 0.09-0.10 SE por localizacion a 0.0105/ciclo; <= 0.05 SE a las tasas del tracking",
+  "nota": "Relacionado, pero no es el error del item: el detector (TCSPC) no tiene tiempo muerto y en un ciclo con >= 2 haces sobrevive el k mas alto (F101, verificado); a las tasas de los estudios y del tracking es despreciable. Para tracking real haria falta movimiento con dt < 50 ns * M_p y los tiempos muertos del hardware."
+ }
+]
