@@ -2,7 +2,7 @@
  "id": "2026-09-28_review-pminflux-sim",
  "type": "feature+derive",
  "status": "active",
- "round": 1,
+ "round": 2,
  "rounds_budget": 3,
  "worker_count": 3,
  "team": {
@@ -323,14 +323,230 @@
    "text": "Sustitución de datos: C:\\Data\\psf\\20260820 no existe; los EBP ideal/geom_exp/realistic_fit se reconstruyen de forma exacta (la escalera se reproduce al 4.º decimal), el sustituto 20260703 está rotulado en findings_B.json, y ninguna conclusión cualitativa de F201–F206 depende de él; los números 'Experimental' exactos (18.35/62.76/1.89) no se reprodujeron, y eso está declarado",
    "round": 1,
    "source": "verifier"
+  },
+  {
+   "status": "verified",
+   "text": "Suite completa (python -m unittest discover -s tests, Py 3.8.6): 50 tests, 49 OK, 1 error esperado (test_html_report_covers_every_finding: falta report/index.html), 43 s",
+   "round": 2,
+   "source": "code-reviewer"
+  },
+  {
+   "status": "verified",
+   "text": "simulate._recorded_earliest (tiempo muerto no paralizable que abarca ciclos + TCSPC primera avalancha por ciclo) coincide con una referencia secuencial independiente en 900 filas al azar (d en {0,5,22,60,120} ns): 0 discrepancias",
+   "round": 2,
+   "source": "code-reviewer"
+  },
+  {
+   "status": "verified",
+   "text": "Truncado t_cut / N fija / bloques: la rama de extensión forzada da N exacta y la misma distribución que la corrida normal (homogeneidad p=0.61 earliest con 8e6 fotones; 0.26 highest; 0.12 none); con 4 bloques las sumas son exactas; la fracción de fondo detectada es 0.04537 contra 0.04535 nominal (el fondo compite en TCSPC y la convención SBR es consistente con la beta del estimador)",
+   "round": 2,
+   "source": "code-reviewer"
+  },
+  {
+   "status": "verified",
+   "text": "crb con free_powers y con free_powers+beta compartido (complemento de Schur) coincide a 1e-6 con la inversa del Fisher conjunto completo por diferencias finitas en 5 posiciones; K=3 con free_bg devuelve inf",
+   "round": 2,
+   "source": "code-reviewer"
+  },
+  {
+   "status": "verified",
+   "text": "mle_mixing (grilla + Fisher scoring con conjunto activo) nunca da peor NLL que Nelder-Mead multi-arranque en 120 casos (N=10-100, SBR inf/5/21, y free_bg con beta en la cota 0)",
+   "round": 2,
+   "source": "code-reviewer"
+  },
+  {
+   "status": "verified",
+   "text": "compare_legacy_vs_v2.json: source=v2sim, sha256 iguales al código actual, convención N=Ns+Nb/sbr=Ns/Nb consistente entre simulate, estimate y crb, 0 fallas en 60 ajustes, sesgo asintótico del legado 0.848/1.510/1.625/2.694/2.364 nm (F104)",
+   "round": 2,
+   "source": "code-reviewer"
+  },
+  {
+   "status": "verified",
+   "text": "findings.json: 16 entradas verificadas, todos los v2_test resuelven a tests existentes que pasan (F107 null declarado); clases según el inbox (F104 CONCEPTUAL, F201/F202 DISENO)",
+   "round": 2,
+   "source": "code-reviewer"
+  },
+  {
+   "status": "refuted",
+   "text": "Robustez del estimador y del CRB con b > T/K no está garantizada ni avisada: con b=20, r0=(-15,15) y datos v2sim N=2095, mle_mixing (grid_step por defecto) cae en un óptimo local equivocado en 193/300 locs (16.7 nm de error medio) con converged=True y n_failed=0, e incluso con conteos exactos devuelve (-13.5, 41.0); con b=30 RMSE/CRB=0.575 (CRB multinomial inválida con ventanas solapadas). Sin guard en simulate/crb/mle_mixing",
+   "round": 2,
+   "source": "code-reviewer"
+  },
+  {
+   "status": "unclear",
+   "text": "Rendimiento: el arranque en grilla del MLE no está partido en bloques (359 MB con 1e5 locs, ~3.6 GB con 1e6; free_powers lo repite en cada evaluación); el punto fijo del tiempo muerto es O(n^2) a saturación (d=500 ns, 0.3/ciclo: 13.3 s y 448 MB para 1e6 fotones). Bien a las tasas del tracking",
+   "round": 2,
+   "source": "code-reviewer"
+  },
+  {
+   "status": "unclear",
+   "text": "Tests débiles: test_compare_json_complete no exige source==v2sim ni sha256 actuales; F204 solo comprueba SE>0; el caso none de test_low_rate pasa con p=0.0018 contra el umbral 1e-3 (con 10 semillas juntas p=0.11: es una fluctuación, pero frágil); los ceros de F102 se comprueban con la misma fórmula del código",
+   "round": 2,
+   "source": "code-reviewer"
+  },
+  {
+   "status": "unclear",
+   "text": "El modelo directo del estimador no incluye la distorsión de TCSPC y tiempo muerto a tasa finita: el sesgo de la mezcla llega a ~4 SE (0.098 nm) en el estudio v2sim; documentado, no es un bug; la hipótesis de W2 'd = n*T anula el sesgo' no está verificada",
+   "round": 2,
+   "source": "code-reviewer"
+  },
+  {
+   "status": "unclear",
+   "text": "Docstring de estimate: 'con free_bg local el CRB crece mucho' contradice los datos propios (1.000-1.038x). Con N baja el 1.3% sale converged=False aunque está en el óptimo (dNLL<=1e-6)",
+   "round": 2,
+   "source": "code-reviewer"
+  },
+  {
+   "status": "unclear",
+   "text": "Usabilidad como reemplazo: faltan README, ejemplo de punta a punta, notas de migración legado->v2, __init__.py desactualizado (no expone simulate/estimate/psf), empaquetado, una función pública para contar microtiempos reales en ventanas, y el port de F107; report/index.html ausente (aceptación en rojo). Obligatorio en R3",
+   "round": 2,
+   "source": "code-reviewer"
+  },
+  {
+   "status": "verified",
+   "text": "W2-R2 simulate.py a 1e-3/ciclo (earliest, dead_time 22) coincide con el modelo de mezcla y rechaza el ingenuo: simulador propio fotón por fotón (ruta independiente) p=0.74 (IRF 0.3) / 0.96 (sin IRF) / 0.30 (none) con ~1.5e6 fotones, ingenuo p=0; v2 en las mismas configuraciones p=0.72/0.14/0.56; dos muestras propio vs v2 p=0.29-0.65",
+   "round": 2,
+   "source": "verifier"
+  },
+  {
+   "status": "verified",
+   "text": "W2-R2 ventanas periódicas con IRF 0.3: a=-0.5,b=10.1 / (2,12) cruzando T / (-1.5,12.5): propio p=0.91/0.74/0.39, v2 p=0.037/0.43/0.30, dos muestras p=0.15/0.47/0.28",
+   "round": 2,
+   "source": "verifier"
+  },
+  {
+   "status": "verified",
+   "text": "W2-R2 el tiempo muerto no paralizable + TCSPC primer fotón de simulate._recorded_earliest (punto fijo vectorizado) es idéntico a un bucle secuencial propio en 1800 filas x 400 fotones, d en {0..300} ns y tasas 0.01-30/ciclo (0 discrepancias)",
+   "round": 2,
+   "source": "verifier"
+  },
+  {
+   "status": "verified",
+   "text": "W2-R2 tcspc='highest' reproduce el predictor sim_exp de F101 a 0.3/ciclo (propio p=0.17/0.63, v2 p=0.86/0.68 con IRF 0.3/0; ideal y earliest p=0); earliest d=0 coincide con el predictor 'earliest' con tau=1.5 a 0.3/ciclo y tau=1.0 a 0.2/ciclo, y con tau=4.21 a 0.1/ciclo se aparta ~1e-3 en fracción (propio +1.36e-3 en w0, p=5e-7; v2 igual, dos muestras p=0.68) por la competencia en el ciclo de llegada; desaparece a 0.02/ciclo",
+   "round": 2,
+   "source": "verifier"
+  },
+  {
+   "status": "verified",
+   "text": "W2-R2 conteo legacy F103: pérdida de ventana 0 con a=-0.5,b=12.5 esperada 6.842 % (tau 4.21) / 2.535 % (0.001) por cuadratura propia; los 6.81±0.07 / 2.46±0.06 de v2 son consistentes; F102: v2 con a=-0.25 da 99.0 % en la ventana 0 y 198344 ceros/loc (esperado 198480±~300)",
+   "round": 2,
+   "source": "verifier"
+  },
+  {
+   "status": "refuted",
+   "text": "W2-R2 'el valor esperado del doble conteo con b=13, tau=4.21 es 11.15 %' (referencia del test) — el exacto es 11.175 % (cuadratura propia 0.111746; MC propio 1.05e8 fotones 11.173±0.003 %; v2 1.05e7 fotones 11.174±0.010 %, sin sesgo); el 11.11 % reportado es la semilla 51 (8.4e5 fotones, -1.9 SE). Error menor de 0.025 puntos; el test pasa igual",
+   "round": 2,
+   "source": "verifier"
+  },
+  {
+   "status": "verified",
+   "text": "W2-R2 barrido de tiempo muerto: el sesgo 'earliest' desaparece exactamente para dead_time = n*T (50, 100 ns) a cualquier tasa — prueba: con SPAD no paralizable y d>=T cabe <=1 avalancha en una ventana de largo d, P(muerto en t)=int_{t-d}^{t} r(s)ds = n*(avalanchas por período) = constante, así que la densidad registrada es proporcional a lambda(t); con d=35 y 75 ns vuelve (a 0.0105/ciclo, predicho a primer orden [-.001,.038,.011,-.053] y [.006,.053,-.018,-.041] SE/loc; MC propio 4e7 [.009,.030,.003,-.040] y [.005,.047,-.016,-.036]; v2 4e7 coincide, dos muestras p=0.45/0.99); d=50/100: propio y v2 p=0.43-0.88",
+   "round": 2,
+   "source": "verifier"
+  },
+  {
+   "status": "verified",
+   "text": "W2-R2 sesgo por ventana contra la mezcla ideal <=0.11 SE/loc a 0.0105/ciclo (d=0: predicho [.039,.103,-.023,-.104], propio [.045,.090,-.004,-.112]) y <=0.06 SE a <=2.5e-3/ciclo (el sesgo real predicho es ~0.025 SE; el resto es ruido del MC); highest y earliest con signos opuestos en los haces 1 y 3",
+   "round": 2,
+   "source": "verifier"
+  },
+  {
+   "status": "verified",
+   "text": "W2-R2 rendimiento: simulate_counts con los parámetros por defecto da 2.3e6 fotones/s (2e4x2000 en 17.4 s, extrapolado a 1e5x2000 en 87 s; W2 midió 96.5 s)",
+   "round": 2,
+   "source": "verifier"
+  },
+  {
+   "status": "verified",
+   "text": "W2/W3-R2 python -m unittest tests.test_simulate tests.test_estimate tests.test_mixing: 44 OK; discover: 50 tests, solo falla test_html_report_covers_every_finding (falta report/index.html, esperado); sha de test_acceptance.py intacto",
+   "round": 2,
+   "source": "verifier"
+  },
+  {
+   "status": "verified",
+   "text": "W3-R2 sesgo asintótico del legado (Ec. 3.5) en el setup medido reproduce F104 con código propio: IRF0 SBR21 0.848/1.510/1.625/2.694/2.364 nm, SBR6 0.585/0.729/1.664/2.323/1.933; IRF 0.3: 0.875/1.545/1.647/2.740/2.406 y 0.577/0.749/1.688/2.367/1.985 (igual a la tabla al tercer decimal)",
+   "round": 2,
+   "source": "verifier"
+  },
+  {
+   "status": "verified",
+   "text": "W3-R2 tabla compare_legacy_vs_v2 reproducida en los 20 casos con simulador, MLE y CRB propios y otra semilla: CRB_mezcla y crb_minflux idénticos a 3 decimales; legado |b| 0.556-2.712 nm, RMSE/CRB 1.110-2.052 (peor caso (-15,15) SBR21 IRF0.3: 2.052 vs 2.059); MLE de mezcla RMSE/CRB 0.971-1.033, |b|<=0.10 nm",
+   "round": 2,
+   "source": "verifier"
+  },
+  {
+   "status": "verified",
+   "text": "W3-R2 CRB_mezcla/crb_minflux = 1.0859-1.1349 en el setup de F104 (SBR 21, IRF 0); en los 20 casos el rango es 1.068 (SBR 6) - 1.144 (SBR 21, IRF 0.3)",
+   "round": 2,
+   "source": "verifier"
+  },
+  {
+   "status": "verified",
+   "text": "W3-R2 hallazgo lateral: a 2.5e-3/ciclo con TCSPC earliest (d=22) las fracciones por ventana se desvían ~1e-3 relativo de window_probs con déficit en la ventana 3 (MC propio -0.9e-3 a -1.0e-3 en w3; primer orden -0.7e-3 a -1.0e-3; desaparece con d=50 o tcspc none); es física de tasa finita, no un bug",
+   "round": 2,
+   "source": "verifier"
+  },
+  {
+   "status": "refuted",
+   "text": "W3-R2 'el sesgo MC del MLE de mezcla en v2sim coincide con el sesgo implícito de las fracciones, así que no viene del estimador; <=0.11 nm' — el sesgo inducido por la tasa finita es ~0.02-0.035 nm (primer orden y MC con 20000 locs: +0.02 nm en x frente a multinomial); en (0,-30) SBR21 el MLE tiene by=-0.036±0.011 nm también con datos multinomiales puros (sesgo O(1/N) del MLE a N~2000, no un bug); el 0.092±0.023 de (20,0) SBR6 es ~0.03 real más una fluctuación de 2.6 sigma. La cota <=0.11 nm es verdadera pero ~3 veces holgada; todo es <=0.03 CRB",
+   "round": 2,
+   "source": "verifier"
+  },
+  {
+   "status": "verified",
+   "text": "W3-R2 F202 en v2: con potencias [21.02,16.65,22.96,22.86] el modelo de potencias iguales se sesga 2.6-7.8 nm (asintótico propio 6.17/5.99/7.83/2.60/7.72; MC 300 locs 6.09/5.96/7.79/2.58/7.54); con potencias conocidas <=0.14 nm; con potencias compartidas libres (perfilado propio sobre 5 posiciones x 300) las potencias se recuperan a <=0.8 % y el sesgo queda en <=0.17 nm",
+   "round": 2,
+   "source": "verifier"
+  },
+  {
+   "status": "verified",
+   "text": "W3-R2 F108 corregido: estimate.cov_ellipse da ángulo exacto (error <=6e-14 grados en 30 covarianzas, incluidas casi isótropas y casi degeneradas) y los puntos del borde tienen Mahalanobis^2 = r2 = chi2.ppf(0.683,2) = 2.30 (convención: región 2D del 68.3 %, no ±1 sigma por eje)",
+   "round": 2,
+   "source": "verifier"
+  },
+  {
+   "status": "verified",
+   "text": "W3-R2 F110 corregido: con sbr=inf forward_probs, crb (0.899/0.900/1.091 nm en (5,-5),(0,0),(20,0)), mle_mixing y mle_legacy son finitos; el MLE de mezcla sin sesgo (-0.008,-0.002 nm, 200 locs)",
+   "round": 2,
+   "source": "verifier"
+  },
+  {
+   "status": "verified",
+   "text": "W1-R2 F205, sentido resuelto: analyze_realistic_psf.py:88 calcula el RMSE contra R0=(-5.07,-7.56); con 1e5 muestras (MLE de grilla propio) da 0.962 nm en el ideal (0.948 en la geometría), mientras que contra el píxel realmente simulado (-5,-8) da 0.913 (0.898). 0.912 es el valor correcto y 0.960 el que produce el script legado (inflado por el desplazamiento de 0.4455 nm); 'pasa de 0.912 a 0.960' describe la inflación, no una corrección. El honest_rmse_nm=0.9122 (etapa geometry) del CSV de la autora es un MC chico de la cantidad inflada (esperado 0.948, SE~0.037); que coincida es casualidad",
+   "round": 2,
+   "source": "verifier"
+  },
+  {
+   "status": "verified",
+   "text": "W1-R2 findings.json: los 17 ids distintos de v2_test/v2_tests de las 16 entradas existen y pasan (python -m unittest: 17 OK); F107 tiene v2_test null; compare_legacy_vs_v2.json tiene source v2sim y sha256 de simulate/estimate iguales a los archivos actuales",
+   "round": 2,
+   "source": "verifier"
+  },
+  {
+   "status": "unclear",
+   "text": "W2-R2 n_mode='poisson' (media/varianza), los intervalos KS del tiempo muerto con d>T, beta libre, la fracción en el borde de F203 y el control cruzado con ts.pos_MINFLUX — sus tests pasan pero no los reproduje por otra ruta",
+   "round": 2,
+   "source": "verifier"
+  },
+  {
+   "status": "unclear",
+   "text": "W2-R2 'highest reproduce sim_exp' con fondo a tasa alta — v2 fija el SBR incidente y recorta la señal registrada por (1-e^-x)/x, mientras sim_exp fija Ns:Nb registrados; a 0.0105/ciclo es 0.5 % del SBR (despreciable) y a 0.3/ciclo con fondo ~14 %; los tests de highest usan sbr=inf. Falta decidir si se documenta como limitación",
+   "round": 2,
+   "source": "verifier"
   }
  ],
  "plan": [
-  "R1: validación de la matriz de mezcla contra sim_exp + auditorías A (núcleo) y B (estudios)"
+  "R1: validación de la matriz de mezcla contra sim_exp + auditorías A (núcleo) y B (estudios)",
+  "R2: registro de hallazgos verificado, simulador en dominio temporal, estimador consciente de la fuga, comparación legado vs v2"
  ],
  "backlog": [
-  "R2: fusionar findings_A+B en results/findings.json con las correcciones de los verificadores y status verified; simulador nuevo (dominio temporal: τ, IRF, ventanas periódicas, fuga, TCSPC primer fotón + tiempo muerto, fondo uniforme, N Poisson opcional) + estimador con verosimilitud de mezcla (C·λ + fondo b/T, fondo/potencias libres opcional) + CRB consistente; tests que reproduzcan cada hallazgo corregido; comparación legado vs nuevo en el setup medido",
-  "R3: reporte HTML autocontenido (hallazgos por clase, 'crimen inverso', qué estaba bien, qué hacer distinto, figuras embebidas) + README + verificación final"
+  "FIX (refuted r2): guard para b > T/K (ventanas solapadas) en simulate/crb/mle_mixing, o error explícito",
+  "FIX (refuted r2): referencia del doble conteo con b=13, tau=4.21: 11.175 % (no 11.15; el 11.11 era una semilla)",
+  "FIX (refuted r2): texto 'sesgo residual del MLE de mezcla ≤0.11 nm no viene del estimador' -> tasa finita 0.02–0.035 nm + sesgo O(1/N) del MLE (~0.036 nm); todo ≤0.03 CRB",
+  "F205 redacción: 0.912 nm es el RMSE correcto (contra el píxel simulado); 0.960 lo produce el script legado (inflado por 0.4455 nm)",
+  "Documentar: d = n·T anula exactamente el sesgo de tiempo muerto (demostrado por el verificador); 'highest' con fondo a tasa alta fija SBR incidente vs sim_exp registrado (limitación); tiempo muerto 22 ns supuesto; IRF 0.3 ns supuesto",
+  "Usabilidad: README, __init__ que exponga simulate/estimate/psf/mixing, ejemplo de punta a punta, tabla de migración legado→v2, función pública para contar microtiempos reales en ventanas (periódicas), endurecer test_compare_json_complete, rendimiento del arranque en grilla (chunking)",
+  "R3: report/index.html autocontenido (hallazgos por clase, crimen inverso, qué estaba bien, qué hacer distinto, tabla legado vs v2, figuras embebidas) + verificación final"
  ],
  "history": [
   {
@@ -340,6 +556,15 @@
     "verified": 41,
     "refuted": 5,
     "unclear": 3
+   }
+  },
+  {
+   "round": 2,
+   "summary": "Simulador temporal (τ, IRF, ventanas periódicas, fuga, TCSPC primer fotón + tiempo muerto) validado; estimador de mezcla insesgado (RMSE/CRB 0.97–1.03) frente al legado (|b| 0.56–2.7 nm, RMSE/CRB 1.1–2.06); d=n·T anula el sesgo de tiempo muerto (demostrado).",
+   "claims": {
+    "verified": 25,
+    "refuted": 3,
+    "unclear": 7
    }
   }
  ],
