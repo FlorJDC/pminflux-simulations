@@ -1,0 +1,353 @@
+"""A job = an isolated subtree (jobs/<id>/) + a lifecycle.
+
+Layout of a job dir:
+  spec.json   intent + team + backend/model/effort + budget + status   (machine; you rarely open)
+  state.json  compact resumable "where I am"                            (machine; rendered to HTML)
+  inbox.jsonl human-injected directions (append-only; consumed on resume)
+  view.html   self-contained monitor + inject page                     (you open this)
+  out/        the deliverable you read (tex/pdf/notebook/diff/html)
+  work/       the agents' sandbox
+  log.jsonl   per-round cost/events
+  .stop       kill-switch sentinel (present only when a stop was requested)
+
+Nothing about a job's fate is baked in: it runs, it stops, and *you* decide
+resume(+direction) / freeze / abandon.
+"""
+
+from __future__ import annotations
+
+import hashlib
+import json
+import os
+import re
+import shutil
+import subprocess
+import sys
+import threading
+from datetime import datetime
+
+from . import recipes as recipes_mod, staffing
+
+STATUSES = ("created", "running", "stopped", "done", "frozen", "abandoned")
+
+_LOG_LOCK = threading.Lock()  # parallel workers all log their own per-call line
+
+
+def project_root() -> str:
+    return os.environ.get("AGENT_TEAM_PROJECT", os.getcwd())
+
+
+def jobs_root() -> str:
+    return os.environ.get("AGENT_TEAM_JOBS", os.path.join(project_root(), "jobs"))
+
+
+def _sha256(path) -> str | None:
+    try:
+        with open(path, "rb") as fh:
+            return hashlib.sha256(fh.read()).hexdigest()
+    except OSError:
+        return None
+
+
+def git_head() -> str | None:
+    """The project's current commit, or None if it isn't a git repo.
+
+    Recorded as a code job's ``base_commit`` so the change set it produces has a fixed anchor
+    (and the human an exact point to roll back to).
+    """
+    try:
+        proc = subprocess.run(["git", "rev-parse", "HEAD"], cwd=project_root(),
+                              capture_output=True, text=True, timeout=30)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    return proc.stdout.strip() or None if proc.returncode == 0 else None
+
+
+def _slug(text: str, n: int = 4) -> str:
+    words = re.findall(r"[a-z0-9]+", text.lower())
+    return "-".join(words[:n]) or "job"
+
+
+class Job:
+    def __init__(self, job_id: str):
+        self.id = job_id
+        self.dir = os.path.join(jobs_root(), job_id)
+
+    # --- paths ---
+    @property
+    def spec_path(self):   return os.path.join(self.dir, "spec.json")
+    @property
+    def state_path(self):  return os.path.join(self.dir, "state.json")
+    @property
+    def inbox_path(self):  return os.path.join(self.dir, "inbox.jsonl")
+    @property
+    def log_path(self):    return os.path.join(self.dir, "log.jsonl")
+    @property
+    def stop_path(self):   return os.path.join(self.dir, ".stop")
+    @property
+    def view_path(self):   return os.path.join(self.dir, "view.html")
+    @property
+    def work_dir(self):    return os.path.join(self.dir, "work")
+    @property
+    def out_dir(self):     return os.path.join(self.dir, "out")
+    @property
+    def transcript_dir(self): return os.path.join(self.dir, "transcript")
+    @property
+    def reports_dir(self):    return os.path.join(self.dir, "reports")
+
+    def reports_of_round(self, round_no) -> list[str]:
+        """The report files a given round left, newest round first when scanned backwards.
+
+        Reports are written BY the roles, unlike ``transcript/`` which the engine captures.
+        That is the difference that matters: a transcript is a recording, a report is an
+        artifact its author chose the contents of, and it is what the next round reads.
+        """
+        try:
+            names = sorted(os.listdir(self.reports_dir))
+        except OSError:
+            return []
+        pre = f"r{int(round_no):02d}-"
+        return [n for n in names if n.startswith(pre)]
+
+    def save_transcript(self, round_no, label, text, header=None):
+        """Keep every role call's full reply on disk.
+
+        ``state.json`` keeps only the newest plan and 600 characters of the last verifier report,
+        so a finished job could not be explained after the fact -- you could see that eight rounds
+        happened and not what any of them was asked to do. Disk is cheap; post-mortems are not.
+        """
+        try:
+            os.makedirs(self.transcript_dir, exist_ok=True)
+            path = os.path.join(self.transcript_dir, f"r{int(round_no):02d}-{label}.txt")
+            with open(path, "w", encoding="utf-8") as fh:
+                if header:
+                    fh.write("".join(f"# {k}: {v}\n" for k, v in header.items()) + "\n")
+                fh.write((text or "")[:400_000])
+        except OSError:
+            pass
+
+    # --- creation ---
+    @classmethod
+    def create(cls, *, job_type, intent, backend, model, effort, rounds=None,
+               budget_tokens=None, worker_count=None, name=None,
+               timeout=None, idle_timeout=None, roles=None,
+               acceptance=None, acceptance_guard=None, checkpoint_rounds=2) -> "Job":
+        recipe = recipes_mod.load(job_type)
+        # per-role overrides: recipe defaults first, your --role flags on top (key by key)
+        role_cfg = staffing.merge(recipe.get("roles"),
+                                  staffing.normalize(roles, recipe["team"], source="--role"))
+        d = recipe["defaults"]
+        stamp = datetime.now().strftime("%Y-%m-%d_%H%M%S")
+        slug = _slug(name, n=8) if name else _slug(intent)  # --name overrides the intent-derived slug
+        job_id = f"{stamp}_{job_type}-{slug}"
+        job = cls(job_id)
+        os.makedirs(job.work_dir, exist_ok=True)
+        os.makedirs(job.out_dir, exist_ok=True)
+        spec = {
+            "id": job_id,
+            "type": job_type,
+            "intent": intent,
+            "status": "created",
+            "backend": backend,
+            "model": model,
+            "effort": effort,
+            "rounds": rounds if rounds is not None else d["rounds"],
+            "worker_count": worker_count if worker_count is not None else d["worker_count"],
+            "budget_tokens": budget_tokens if budget_tokens is not None else d["budget_tokens"],
+            "timeout": timeout,            # hard per-call wall-clock ceiling; None = off
+            "idle_timeout": idle_timeout,  # None = backend default (1800s); 0 = off
+            "team": recipe["team"],
+            "roles": role_cfg,             # per-role backend/model/effort/when; {} = all uniform
+            "kind": recipe["kind"],
+            "deliverable": recipe["deliverable"],
+            "checks": recipe.get("checks", {"command": ""}),
+            "created": datetime.now().isoformat(timespec="seconds"),
+            "round": 0,
+            "cost_usd": 0.0,
+            "tokens": 0,
+        }
+        if recipe["kind"] == "code":
+            spec["base_commit"] = git_head()  # anchor for out/changes.diff; None if not a git repo
+        # progress tripwires: on for real backends, off for `mock` (which exists to exercise the
+        # machinery, and would otherwise trip its own stall detector)
+        spec["tripwires"] = backend != "mock"
+        # stop for a human look after this many rounds of a fresh job; `--rounds N` overrides
+        spec["checkpoint_rounds"] = checkpoint_rounds
+        if acceptance:
+            spec["acceptance"] = {
+                "command": acceptance,
+                # hash-pinned so the gate can be passed but never edited
+                "files": {p: _sha256(p if os.path.isabs(p) else os.path.join(project_root(), p))
+                          for p in (acceptance_guard or [])},
+            }
+        job.save_spec(spec)
+        job.save_state({
+            "intent": intent, "round": 0, "status": "created",
+            "plan": "", "rounds_log": [], "claims": [], "backlog": [],
+            "checks": {}, "acceptance": {}, "progress": [], "inbox_cursor": 0,
+        })
+        job._seed_deliverable(recipe)
+        job._seed_provenance(recipe)
+        return job
+
+    def _seed_deliverable(self, recipe):
+        dtype = recipe["deliverable"]["type"]
+        path = os.path.join(self.dir, recipe["deliverable"]["path"])
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        if os.path.exists(path):
+            return
+        seed = {
+            "tex": ("% Deliverable for: " + self.id + "\n\\documentclass{article}\n"
+                    "\\begin{document}\n% The writer role fills this in.\n\\end{document}\n"),
+            "diff": "# The changes (unified diff) land here; the code itself is edited in the project.\n",
+            "html": "<!doctype html><meta charset=utf-8><title>" + self.id + "</title>\n",
+            "notebook": ("# %% [markdown]\n# Deliverable notebook for " + self.id
+                         + " (jupytext percent format)\n"),
+        }.get(dtype, "")
+        with open(path, "w", encoding="utf-8") as fh:
+            fh.write(seed)
+
+    def _seed_provenance(self, recipe):
+        prov = recipe.get("provenance")
+        if not prov:
+            return
+        reg = os.path.join(self.dir, prov["registry"])
+        os.makedirs(os.path.dirname(reg), exist_ok=True)
+        if not os.path.exists(reg):
+            with open(reg, "w", encoding="utf-8") as fh:
+                fh.write("{}\n")
+
+    # --- spec / state IO ---
+    def load_spec(self) -> dict:
+        with open(self.spec_path, encoding="utf-8") as fh:
+            return json.load(fh)
+
+    def save_spec(self, spec: dict):
+        _atomic_write_json(self.spec_path, spec)
+
+    def load_state(self) -> dict:
+        with open(self.state_path, encoding="utf-8") as fh:
+            return json.load(fh)
+
+    def save_state(self, state: dict):
+        _atomic_write_json(self.state_path, state)
+
+    def recipe(self) -> dict:
+        return recipes_mod.load(self.load_spec()["type"])
+
+    def exists(self) -> bool:
+        return os.path.exists(self.spec_path)
+
+    # --- inbox (human steering) ---
+    def say(self, text: str):
+        with open(self.inbox_path, "a", encoding="utf-8") as fh:
+            fh.write(json.dumps({"ts": datetime.now().isoformat(timespec="seconds"),
+                                 "text": text}) + "\n")
+
+    def _inbox_texts(self) -> list[str]:
+        if not os.path.exists(self.inbox_path):
+            return []
+        with open(self.inbox_path, encoding="utf-8") as fh:
+            lines = [ln for ln in fh.read().splitlines() if ln.strip()]
+        out = []
+        for ln in lines:
+            try:
+                out.append(json.loads(ln)["text"])
+            except (json.JSONDecodeError, KeyError):
+                out.append(ln)
+        return out
+
+    def drain_inbox(self, state: dict) -> tuple[list[str], int]:
+        """``(every direction ever sent, how many are new this round)``.
+
+        This used to return only the new ones and advance a cursor, so a human direction was
+        put in front of the team for exactly one round and then vanished -- under a heading
+        that called it TOP PRIORITY. A direction is a standing instruction, not a message:
+        it stays in force until the human withdraws it. The cursor survives only to say
+        which ones arrived since the last round.
+        """
+        texts = self._inbox_texts()
+        cursor = min(state.get("inbox_cursor", 0), len(texts))
+        state["inbox_cursor"] = len(texts)
+        return texts, len(texts) - cursor
+
+    # --- stop / lifecycle ---
+    def request_stop(self):
+        with open(self.stop_path, "w") as fh:
+            fh.write(datetime.now().isoformat())
+
+    def stopped(self) -> bool:
+        return os.path.exists(self.stop_path)
+
+    def clear_stop(self):
+        if os.path.exists(self.stop_path):
+            os.unlink(self.stop_path)
+
+    # --- liveness (a runner writes its pid; is_running verifies the process is alive) ---
+    @property
+    def pid_path(self):
+        return os.path.join(self.dir, "job.pid")
+
+    def write_pid(self):
+        with open(self.pid_path, "w") as fh:
+            fh.write(str(os.getpid()))
+
+    def clear_pid(self):
+        if os.path.exists(self.pid_path):
+            os.unlink(self.pid_path)
+
+    def is_running(self) -> bool:
+        try:
+            pid = int(open(self.pid_path).read().strip())
+        except (OSError, ValueError):
+            return False
+        if sys.platform == "win32":
+            # os.kill(pid, 0) is not an existence check on Windows: signal 0 collides
+            # with CTRL_C_EVENT, which routes through GenerateConsoleCtrlEvent and can
+            # raise SystemError instead of OSError for a dead pid. Ask the OS directly.
+            import ctypes
+            PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
+            handle = ctypes.windll.kernel32.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, False, pid)
+            if not handle:
+                return False  # stale pid file (process gone) -> not running
+            ctypes.windll.kernel32.CloseHandle(handle)
+            return True
+        try:
+            os.kill(pid, 0)  # signal 0: existence check, doesn't actually signal
+        except OSError:
+            return False  # stale pid file (process gone) -> not running
+        return True
+
+    def set_status(self, status: str):
+        assert status in STATUSES, status
+        spec = self.load_spec()
+        spec["status"] = status
+        self.save_spec(spec)
+        state = self.load_state()
+        state["status"] = status
+        self.save_state(state)
+
+    def log(self, event: dict):
+        event = {"ts": datetime.now().isoformat(timespec="seconds"), **event}
+        with _LOG_LOCK:  # workers run in parallel threads; keep lines whole
+            with open(self.log_path, "a", encoding="utf-8") as fh:
+                fh.write(json.dumps(event) + "\n")
+
+
+def list_jobs() -> list["Job"]:
+    root = jobs_root()
+    if not os.path.isdir(root):
+        return []
+    out = []
+    for name in sorted(os.listdir(root)):
+        job = Job(name)
+        if job.exists():
+            out.append(job)
+    return out
+
+
+def _atomic_write_json(path, obj):
+    tmp = path + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as fh:
+        json.dump(obj, fh, indent=2)
+    os.replace(tmp, path)

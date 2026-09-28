@@ -1,0 +1,20 @@
+Grid(400x400 px, 1.0 nm/px -> 400 nm FOV)   FWHM = 343.9 nm   radio de búsqueda = 77.4 nm
+250 muestras por punto, semilla 20260825
+
+EBP                 N      CRB     RMSE     RMSE/CRB   |sesgo|
+--------------------------------------------------------------
+Ideal             100    4.276    4.158     0.97±0.04     0.516
+Ideal             200    3.024    2.864     0.95±0.04     0.268
+Ideal             400    2.138    2.099     0.98±0.04     0.022
+Ideal             800    1.512    1.481     0.98±0.04     0.161
+Ideal            1600    1.069    1.129     1.06±0.05     0.168
+Ideal            3200    0.756    0.840     1.11±0.05     0.193
+
+Experimental      100    9.692   18.287     1.89±0.08     4.138
+Experimental      200    6.853    8.218     1.20±0.05     0.551
+Experimental      400    4.846    6.137     1.27±0.06     0.023
+Experimental      800    3.426    3.631     1.06±0.05     0.081
+Experimental     1600    2.423    2.501     1.03±0.05     0.185
+Experimental     3200    1.713    1.757     1.03±0.05     0.191
+
+OK -> C:\Users\BANGHO\Documents\GithubPRO\p-minflux-main\documento\figs\eficiencia_vs_fotones.png

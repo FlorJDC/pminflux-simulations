@@ -1,0 +1,343 @@
+# agent-team — backlog
+
+A running list of enhancements to consider. Add to it as ideas come up during real use.
+(Deeper "not in v0.1, by design" items are also noted in `docs/DESIGN.md`.)
+
+**Standing priorities (2026-07-27).** Functionality over reporting: the numbers exist so Matias
+has a *sense* of a run, and a subscription means tokens aren't billed per-token anyway. So the
+metering items (#3, #5, #7) are worth fixing but are not urgent, and — importantly — **nothing may
+stop or kill a run mid-flight**. Checks after a run completes are fine; the invariant is that a run
+always lands in a state that's easy to recover from.
+
+## Enhancements
+
+### 1. Per-role / PI-chosen model & effort (under a policy)  — ✅ DONE (see Done section)
+Today model/effort/backend are **uniform per job**: set once at `job new`, stored in `spec.json`,
+and read for *every* role call (`engine.py`, `run_agent(..., model=spec["model"], effort=spec["effort"])`).
+The PI decides the task split and worker count, but **not** the model or effort.
+
+Want (Matias's original idea): differentiate per role — e.g. a cheaper model for grind `worker`s,
+`xhigh` only for the `verifier`; and/or let the PI pick per role, **bounded by `policy.json`**
+(`effort_max`, `backends_allowed`, `max_workers` — only `max_workers` is wired today).
+Sketch: recipes declare optional per-role `{model, effort, backend}`; PI staffing may set them
+within the policy ceiling; `_run_role` reads the role's override, falling back to the job default.
+
+### 2. Liveness / "is it going?" signal  — ✅ DONE (see Done section)
+Mid-round the on-disk state only updates at each round's **END**, so `view.html` and `job status`
+look frozen while workers are actually running (xhigh calls take minutes) — you can't confirm a
+run started correctly without inspecting processes. Want:
+- the engine writes a **heartbeat each step** (not just each round): a timestamp + current phase
+  (`"round 2 · workers(2) running"` / `"verifier"` / `"writing"` / `"checks"`);
+- `view.html` shows a **live badge** (`● live — updated 8s ago` vs `stale`);
+- `job status` (or a new `job watch`) reports the phase, last-activity age, and whether the runner
+  process is alive.
+
+### 3. Rough token→$ money estimate  — LOW (reporting, not functionality)
+`codex` reports tokens but no dollar cost (shows `$0.000`). Add a per-model token→$ rate table and
+display an **estimated** cost next to tokens (for all backends; codex especially). Label it "est."
+Note: on a subscription the dollar figure is a *sense of scale*, not a bill — so this is nice to
+have, not load-bearing. Now that roles can run on different backends, a rate table would need to be
+per-role to mean anything (`staffing.table(spec)` already gives the per-role breakdown).
+
+### 4. Per-call timeout: too short + discards the report on kill  — ✅ DONE (see Done section)
+`CALL_TIMEOUT=2400` (40 min) killed an xhigh codex worker mid-derivation (first real run).
+Reframed: spend is the budget's job (lossless); a timeout is only a *hang* backstop.
+
+### 5. Token budget vs. xhigh-codex reality  — MEDIUM (default budgets, NOT mid-round stops)
+First real run burned **13.7M tokens in round 1** (one xhigh codex `exec` is an agentic loop —
+~2–3M tokens/call with file reads + running oracles). A 3-round derive ≈ 30–40M tokens. The
+budget guard only checks at round *boundaries*, so it overshoots within a round and a "safety"
+20M cap silently cut the run to ~2 rounds.
+**Decided (2026-07-27):** mid-round budget checks are **rejected** — nothing stops a run in
+flight; a round always finishes so the job lands recoverable. What's left is: much larger default
+budgets (a 400k default against a 13.7M round is theatre), and surfacing projected spend up front.
+Partly mitigated already — tokens now accumulate *per call* rather than at each round's end, so
+the view shows the burn climbing live instead of jumping once a round.
+Per-role effort (#1) is the real lever here: shallow workers, deep verifier.
+
+### 6. Smarter auto-slug  — LOW
+`--name` now lets you set the job id, but the auto-slug still scrapes the intent's first words
+(which can be a preamble). Could skip obvious preface lines or summarize. Minor.
+
+### 7. Claude token accounting misses cache tokens → budget guard is inert  — ✅ DONE (see Done section)
+`_run_claude` sets `itok = usage.input_tokens`, `otok = usage.output_tokens`, and
+`AgentResult.tokens = itok + otok`. Claude reports cached context in **separate** fields
+(`cache_read_input_tokens`, `cache_creation_input_tokens`), so nearly all real consumption is
+invisible to the meter. Measured 2026-07-24 on a trivial one-line prompt:
+counted **7 tokens** (2 in + 5 out) while actually using **15,273 cache-read + 8,588
+cache-creation**. Same trivial task through `run_agent`: claude reported **200** tokens, codex
+**34,888**. Consequences: (a) `_budget_exceeded` never fires on the claude backend — only
+`rounds` bounds a run; (b) token counts are not comparable across backends, so the five existing
+codex jobs and any new claude job can't be read on the same axis.
+Fix sketch: fold both cache fields into `itok` (one line), and note the semantics change in the
+spec so old jobs stay interpretable. Related: since claude reports `total_cost_usd` and codex
+reports nothing, a **`budget_usd`** stop may be the better meter for claude — see #3 and #5.
+Sharper since #1: a job can now mix backends across roles, so a token column that means one thing
+for the codex worker and another for the claude verifier isn't just imprecise, it's incoherent.
+Fixing the claude side is what makes the per-role token numbers comparable.
+(Still a *meter*, not a brake — see the standing priorities: it must not gain the power to stop a
+run mid-flight.)
+
+### 8. Role scheduling: no way to have a role run only at the END  — ✅ DONE (see Done section)
+`extra` roles run **every round** (`for extra_role in spec["team"].get("extra", [])` in the round
+loop), and `lead` / `verifier` are hard-indexed so they can't be dropped at all. The minimum team
+is therefore 3 calls/round (pi + 1 worker + verifier). For a small job you often want the `writer`
+to appear **once, at the end** — a polish/assembly pass over what the worker has been maintaining
+— not on every round paying for a hand-off each time.
+Today's workaround: run with `extra: []`, then `job resume <id> --rounds 1 --say "write-up only:
+..."`, which extends the budget by exactly one round and gives a write-up pass with a direction.
+Fix sketch: per-role schedule in the recipe/team spec — `{"role": "writer", "when": "last"}` with
+`when ∈ every | first | last | [round numbers]`; default `every` so existing recipes are unchanged.
+
+### 9. `job <verb> <id>` needs the exact id  — LOW
+`_need()` does `Job(job_id)` and fails unless the string matches the directory name exactly, so
+every command needs the full `2026-07-24_194925_derive-n6closure`. Accept a unique prefix or
+substring (and `--name`'s slug) and error only on ambiguity.
+
+### 10. `job staff` silently overwrites the human's explicit `--role` pins  — HIGH
+Observed twice on real runs, and the second time it produced a configuration that would have died
+mid-flight overnight.
+
+The README/skill states *"Policy bounds the PI only — the human's own flags are never clamped."*
+The observed behaviour contradicts that: per-role settings passed at `job new` are written to
+`spec.json` correctly, and then `job staff` overwrites them from the PI's `ROLE <role>: ...` lines.
+
+- **2026-07-29** (`derive-precessing-form-v2`), job created `--backend claude --model claude-opus-5`
+  on every role at the human's explicit request. The PI staffed it with
+  `ROLE verifier: effort=xhigh, backend=codex` and `ROLE writer: effort=high`, and also raised
+  `worker_count` 3 → 4. The reasoning was *good* (verifier independence), but it was not the
+  human's call to make.
+- **2026-07-30** (`derive-precessing-form-v3`), created with explicit
+  `--role verifier:backend=codex,model=gpt-5.6-sol,effort=xhigh` after the human said "force all
+  codex". Staffing overwrote it to `backend=claude` — **while leaving `model=gpt-5.6-sol`**, i.e. a
+  codex model name on the Claude backend. `job staff`'s own summary printed
+  `verifier  claude  gpt-5.6-sol  xhigh` without complaint.
+
+Two distinct bugs:
+1. **Human pins are not pinned.** Record which per-role keys came from a human `--role` flag and
+   have staffing refuse to overwrite exactly those (log the PI's suggestion instead of applying
+   it). A PI-chosen value for a key the human did not set is fine and should still work.
+2. **A PI `ROLE` line that changes `backend` inherits the previous `model`.** Changing the backend
+   must reset `model` to the new backend's default unless the same line names one, and an
+   impossible (backend, model) pair should fail at staffing time — before a night of unattended
+   running — not at the first role call.
+
+Workaround in use: edit `spec.json` between `job staff` and `job run`.
+
+### 11. A provider error is recorded as a successful role call  — HIGH
+`derive-precessing-form-v2`, round 1: `worker-1` returned the literal string
+
+    API Error: 529 Overloaded. This is a server-side issue, usually temporary — try again ...
+
+and `log.jsonl` recorded `{"role": "worker-1", "ok": true, "tokens": 4021433}`. 4M tokens were
+charged for no output, the transcript is 280 bytes, and the lead received the error text *as the
+worker's report* — that worker held the critical path (build the solver, ship the first
+`out/model.py`) and nothing re-assigned it.
+
+Want: detect provider error sentinels in a role reply, mark `ok: false`, and either retry the call
+or record the role as failed in `state` so the lead can re-plan around it. At minimum the token
+charge for a failed call should be visible as such, since right now a 529 is indistinguishable from
+a worker that genuinely had little to say. (Consistent with the standing priority — this is a
+post-call check, it does not stop a run mid-flight.)
+
+## Done
+- **Post-mortem of the first `feature` run (2026-07-27): 13.6M tokens, 8 rounds, one module of
+  five, and no headroom number.** Comparable derive runs cost 24M–371M, so the spend was not the
+  anomaly — the *yield* was. Root cause, then the fixes:
+  - `_record_round` harvested claims with a line-anchored regex. The verifier ran on `claude`,
+    whose house style is `**VERIFIED: ...**` and `` - `VERIFIED: ...` `` — **0 of 8 rounds
+    harvested**, versus 23–72 claims in every all-codex job. So "verified stays verified" was
+    inert: every round told every role "Verified so far: (none yet)". The lead re-planned work
+    already done; the writer, whose task is to *transcribe* the ledger, had nothing to transcribe
+    and so re-established the verified state itself every round — 63% of the run's tokens.
+    → `agentteam/claims.py`: explicit ```` ```claims ```` block, decoration-tolerant fallback,
+    and `unharvested()` so a mentions-but-parses-to-nothing report is an alarm.
+  - The lead was never told its `worker_count`, and `_parse_tasks` silently truncated its plan to
+    the first `n` items. With the PI staffing 4 workers and the human cutting to 1, three quarters
+    of every plan hit the floor — "implement gauge.py" was queued eight times and run zero times.
+    → the lead is told the count; surplus tasks go to `state["backlog"]` and run next round.
+  - Nothing measured deliverable progress, so the team optimised the only visible gradient
+    (citation integrity) and even wrote tests asserting the intended modules were *still absent*.
+    → progress tripwires (`agentteam/tripwires.py`), a 2-round checkpoint on fresh jobs, and a
+    hash-pinned human acceptance gate that `[[DONE]]` cannot bypass.
+  - The writer ran every round regardless of whether anything new was verified. → it is skipped
+    unless the ledger grew, its brief forbids re-verifying, and `NOOP` is an allowed answer.
+  - `checks.sh` compiled the tex in a temp dir and deleted it, so the human could not read the
+    deliverable at all. → `_compile_pdf` puts `out/notes.pdf` next to the tex (built in scratch,
+    only the PDF copied back, no `.aux`/`.log` litter).
+  - Per-round role text was thrown away (600 chars of the last verifier report survived), so the
+    run could not be explained afterwards. → full transcripts in `jobs/<id>/transcript/`.
+  - Claude token accounting omitted cache reads (#7), which on an agentic call is most of the
+    spend — the budget guard was blind to any role on that backend. → `_claude_usage` sums the
+    cache fields and falls back to `modelUsage`.
+- **The `feature` recipe was never usable** (found 2026-07-27, before its first run). Four defects,
+  all fixed together:
+  - `deliverable: {type: diff}` starved the `writer` role, whose job is to author
+    `deliverable.path` — so a code job could not produce human-readable notes at all. The
+    deliverable is now `out/notes.tex`, with the change set captured *alongside* it.
+  - `checks.command` was `""`, so `_run_checks` returned `{}` and the round loop gated on nothing.
+    Now `check_provenance.py` + an optional `out/checks.sh` (the code analogue of `derive`'s
+    `out/checks.py`; typically the project's test command).
+  - No `provenance` key, so `_seed_provenance` never seeded a registry. Code jobs deserve
+    traceability too — a reviewer should not have to take the notes on faith.
+  - **`git diff` never showed new files.** A feature job's output is mostly *new* modules, and
+    plain `git diff` reports tracked modifications only; the failure was silent (the exception was
+    swallowed and an empty deliverable touched). Now: `Job.create` records `base_commit` for code
+    jobs, and `_capture_project_diff` marks untracked files intent-to-add (`git add -N .`,
+    index-only) before diffing against that anchor — so the diff covers new files and work the
+    agents committed themselves, and the human gets an exact rollback point.
+  - Team gains `writer` next to `test-writer`; `roles` block runs `code-reviewer` at `xhigh` and
+    the `writer` at `medium`. Tests cover the new-file diff capture and the recipe invariants
+    (every recipe now has a check spine and a provenance registry).
+- **Per-role model / effort / backend, and per-role schedules** (#1 + #8) — `spec["roles"]` maps
+  a role name to `{backend, model, effort, when}`, each key falling back to the job default, so an
+  untouched job behaves exactly as before. New module `agentteam/staffing.py` owns resolution;
+  `_run_role` asks it instead of reading `spec["model"]`/`spec["effort"]`. Layered, later wins key
+  by key: **recipe `roles` block → `job new --role <role>:<k>=<v>,… → PI staffing**, and only the
+  PI layer is clamped by `policy.json` (you're the principal; your flags are never clamped).
+  - The PI may now emit `ROLE <role>: effort=…[, backend=…]` alongside `WORKERS: <n>`; a
+    malformed or out-of-team line is dropped and logged, never fatal.
+  - `policy.json`'s `effort_max` and `backends_allowed` are now actually enforced (they were dead
+    keys); every clamp is recorded in `log.jsonl`.
+  - A role that switches backend picks up *that* backend's default model — the job-level model
+    name belongs to the other CLI's vocabulary. Effort carries across (shared vocabulary).
+    `backends.DEFAULTS` moved from `cli.py` to `backends.py` for this.
+  - `when` ∈ `every` (default) | `first` | `last` | `[rounds]` schedules a recipe's `extra` roles,
+    so `writer:when=last` is one assembly pass instead of a hand-off every round. `last` means the
+    last round of *this run*, so it still fires when the lead signals `[[DONE]]` early or the
+    budget/kill-switch ends things — the deliverable never goes unwritten. Lead and verifier still
+    run every round by design.
+  - Provenance: resolved staffing shows in `job new`/`job status`/`job staff`, in a **Staffing**
+    table in `view.html` (only when the team isn't uniform), and per call in `log.jsonl`
+    (`role_call` with backend/model/effort/tokens). With mixed backends the single job-level model
+    line no longer says what produced a given claim.
+  - Side effects: tokens now accumulate **per call** rather than at each round's end, so the view
+    shows the burn climbing live; `Job.log` took a lock (parallel workers each log a line now).
+  - Recipes are deliberately left uniform, so nothing changed cost or behaviour under you. To make
+    the writer a single end pass, add `"roles": {"writer": {"when": "last"}}` to `recipes/derive.json`.
+- **Idle-backstop timeouts + salvage** — replaced the aggressive 40-min hard timeout. Spend is
+  now bounded only by the token budget + round count (lossless). The backend streams stdout/stderr
+  and kills a call ONLY after `idle_timeout` (default 1800s) of **no output AND no file writes**
+  — a working call that reads/runs/writes is never killed. A hard wall-clock `--timeout` is off by
+  default (`--idle-timeout` also configurable, 0 disables). On any kill the partial report is
+  salvaged from the stream (files on disk already persisted). Verified with fake processes:
+  idle-kill, file-activity-keeps-alive, hard-timeout, and salvage.
+- **Liveness / heartbeat** — the engine writes a phase + timestamp each step (`planning` /
+  `workers running` / `verifying` / `writing` / `checks`) and re-renders, so the view updates
+  mid-round. `view.html` shows the phase in the "updated" line; `job status` marks a live run with
+  `●` + phase; a PID file + `is_running()` back it; new **`job watch <id>`** live-polls until the
+  job ends. (Applies to runs started after this change — a run already in progress uses the old code.)
+- **Intent box rendering** — was a `<p>` (collapsed newlines into a wall of text); now a
+  `<pre class="intent">` so line breaks show and it scrolls if long.
+
+## Deferred by design (see docs/DESIGN.md)
+- Shared cross-job **project corpus** (verified results shared across jobs) — optional layer.
+- PI **approval gate** (plan-and-go is the default).
+- **Stopping a run mid-round.** Rejected 2026-07-27: a round always finishes, so a job lands in a
+  state that's easy to recover from. Budget/kill-switch are checked between rounds only.
+- `budget_tokens_max` in **policy.json** (`max_workers`, `effort_max`, `backends_allowed` are
+  enforced as of #1).
+- Flesh out **`draft` / `wiki`** recipes from real use.
+
+### 20. Compaction silently drops UNRESOLVED claims, and the new index counts from it  — ✅ DONE 2026-09-02
+
+Found 2026-08-17, running six real jobs. `_record_round` keeps
+`verified[-60:] + recent_other[-20:]`, where `recent_other` is everything not verified. On a
+six-round job the verifier emitted **5 refuted and 30 unclear**; `state.json` ended holding
+**0 refuted and 20 unclear**. Five refutations and ten unresolved items aged out of the
+window and are recoverable only from `transcript/`.
+
+That was survivable while nothing read them. It is not survivable now: `_ledger_index` reports
+"UNRESOLVED n claims — each one is your responsibility" and counts from that same truncated
+list, so it told a team `0 refuted` in a round where five refutations were open and unanswered.
+The fix that closed the original bug reintroduced it one layer up.
+
+Either the compaction must never drop a claim that has not been resolved, or the index must
+count from the transcripts. Preference: the first — a claim is cheap (400 chars) and the
+whole point of the status is that something is owed on it. Cap `verified`, never `refuted`
+or `unclear`.
+
+**Done 2026-09-02.** The compaction is gone outright: `_record_round` appends every harvested
+claim and caps nothing, so `_ledger_index`'s UNRESOLVED count cannot be short. `new_verified`
+is now what the verifier established this round rather than a diff of the stored count, which
+also retires the second half of the bug — past 60 verified claims the diff read 0 every round
+and the stall tripwire killed healthy runs. Two tests in `ProgressAccounting` pin both
+directions: a long job still registers progress, and a refutation survives 25 newer claims.
+
+The general lesson, worth keeping in the file: **the failure mode is never a bad decision,
+it is a filter nobody re-examined.**
+
+### 21. `refuted` / `unclear` is too coarse to act on  — MEDIUM
+
+Same six jobs. Reading the verifier's own texts, `unclear` is carrying two populations that
+demand opposite responses:
+
+- *contested*: "the deliverable says 0.3649; my own calculation gives 0.113–0.137",
+  "the two routes are not an independent bracket and one end contradicts the published
+  significance", "the third significant digit is not reproducible". The verifier disagrees
+  and cannot close it alone. **Somebody must adjudicate.**
+- *unverifiable*: "no browser backend exists in this environment". **Nothing is owed; stop
+  trying.** Three different roles retried this over three rounds before a lead finally wrote
+  "three roles have now tried … stop re-attempting".
+
+The verifier's instinct is sound — it files `refuted` when it can demonstrate the mechanism
+and `unclear` when it cannot close the disagreement — but downstream both are just
+"not verified", so a factor-of-three contradiction in a shipped number sits in the same bin
+as a missing browser.
+
+Suggested statuses: `verified` · `refuted` (demonstrated wrong) · `contested` (I get a
+different answer; needs adjudication) · `unverifiable` (cannot be checked here; record and
+stop) · `open` (not attempted). Only `contested` and `open` count as work owed.
+
+### 22. Say the philosophy in SKILL.md, and stop hand-tuning what each role is passed  — MEDIUM
+
+Written 2026-08-17 after a session spent doing exactly the wrong thing. Faced with roles that
+could not see what they needed, the reflex was to engineer the per-role payload — decide, in
+`_build_prompt`, which slice of state each role should get. That is not achievable and it is
+against the design: **the PI decides.** The engine's job is to make everything available and
+say so; deciding what matters this round is the lead's work, not the harness's.
+
+`SKILL.md` and `docs/DESIGN.md` should state it outright, because the absence of the statement
+is what invites the fiddling:
+
+- The job directory is the shared memory. It is small. Every role may read all of it.
+- The prompt carries an INDEX and the round's task — never a curated copy of state.
+- Roles are told what exists and what is owed. Which of it matters is the PI's call.
+- A filter in the harness is a decision taken away from the PI without telling it.
+
+### 23. A direction sent mid-round can be read by nobody, silently  — HIGH
+
+Found 2026-08-17. `job say` appends to `inbox.jsonl` and returns. Nothing is delivered at
+that moment: the inbox is drained once, at the *start* of a round (`engine.py`, top of the
+loop). So a direction is only ever seen if another round begins after it lands.
+
+Observed: a direction was sent at 21:06:05, four minutes into round 7. Round 7 had drained
+the inbox at 21:02 and was the run's last round. No round 8 began. `inbox_cursor` is still
+`0` — the proof that nothing consumed it — and the text sits in `inbox.jsonl` unread. The
+CLI had said `queued for <id>`, the file contains the message, and everything looks fine.
+
+**What is NOT broken, checked before writing this.** The drain happens before the lead runs,
+and `[[DONE]]` comes from that same lead call. So a direction that lands before a round
+starts IS read by the PI, and it decides to stop only afterwards. The decision is not taken
+behind the message.
+
+Two cases, and they need different fixes:
+
+1. **Sent during the final round of the budget.** Knowable at send time. `job say` should
+   look at `spec` and refuse quietly-succeeding: warn on `round >= rounds`, warn when the
+   job is not running at all, and say what to do instead — `job resume --say "..."`, which
+   sends the direction *and* starts a round to read it. (That is exactly why one of the two
+   directions in the test run landed and the other did not.)
+
+2. **Sent during a round in which the PI signals `[[DONE]]`.** Not knowable at send time by
+   anybody. The engine must close it: **do not accept `[[DONE]]` while the inbox has unread
+   entries.** Re-drain before honouring the stop; if anything is unread, run one more round
+   so the direction is seen. `roles/pi.md` already calls human direction TOP PRIORITY, and a
+   stop that outranks an unread instruction contradicts that.
+
+Belt and braces for both: when a run ends, if `inbox_cursor < len(inbox.jsonl)`, say so
+loudly in the CLI's closing line and record it in `state`. A run that finishes with unread
+mail is not a clean finish.
+
+Same family as #20 and #22: the data was on disk the whole time, and the defect is that
+nothing looked at it again.

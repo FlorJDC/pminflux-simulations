@@ -1,0 +1,20 @@
+{
+  "name": "analysis",
+  "description": "Análisis de datos reproducible: notebook/scripts + notas tex, cada número respaldado por un script.",
+  "kind": "understanding",
+  "workdir": "job",
+  "team": {
+    "lead": "pi",
+    "workers": ["worker"],
+    "verifier": "verifier",
+    "extra": ["writer"]
+  },
+  "roles": {
+    "verifier": { "effort": "xhigh" },
+    "writer": { "when": "last" }
+  },
+  "deliverable": { "type": "tex", "path": "out/notes.tex" },
+  "provenance": { "registry": "out/provenance.json" },
+  "checks": { "command": "python {TOOL}/bin/check_provenance.py out/notes.tex out/provenance.json && if [ -f out/checks.py ]; then python out/checks.py; fi" },
+  "defaults": { "rounds": 3, "worker_count": 2, "budget_tokens": 400000 }
+}

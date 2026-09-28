@@ -1,0 +1,9 @@
+# Recetas (tipos de trabajo) propias del proyecto
+
+Un `<nombre>.json` aquí es un tipo de trabajo nuevo para `job new <nombre> ...`, o reemplaza a
+la receta del tool con el mismo nombre. Esquema: ver `agent-team/agentteam/recipes.py` y
+las recetas del tool en `agent-team/recipes/`. Toda receta **debe** tener verificador.
+
+Ejemplo incluido: `analysis.json.example` (renómbralo a `.json` para activarlo). Este LEEME es .txt para que no se confunda con una receta o un rol..
+
+`.\job.cmd recipes` (o `./job.sh recipes`) lista las recetas resultantes (proyecto + tool).

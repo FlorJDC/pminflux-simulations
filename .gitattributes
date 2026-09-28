@@ -1,0 +1,8 @@
+# Line endings for the agent-team files only (does not touch the rest of a project):
+# shell scripts break with CRLF; Windows launchers want CRLF.
+*.sh            text eol=lf
+agent-team/**   text=auto eol=lf
+.agent-team/**  text=auto eol=lf
+.claude/**      text=auto eol=lf
+*.cmd           text eol=crlf
+*.ps1           text eol=crlf

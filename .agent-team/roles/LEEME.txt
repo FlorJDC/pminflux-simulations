@@ -1,0 +1,15 @@
+# Roles propios del proyecto
+
+Un archivo `<nombre>.md` aquí es un rol que el CLI `job` puede usar en cualquier receta, y
+**tiene prioridad** sobre el rol del mismo nombre en el tool (`agent-team/roles/`).
+
+- Para adaptar un rol existente: copia `agent-team/roles/<rol>.md` aquí y edítalo
+  (p. ej. un `verifier.md` que conozca las unidades y convenciones de tu campo).
+- Para un rol nuevo (p. ej. `domain-expert.md`): escríbelo y agrégalo al `team` de una receta.
+- Conserva las dos secciones fijas de los roles originales ("Before you do anything: read the
+  ledger" / "Before you finish: write your report") y, en verificadores, el bloque ```claims```:
+  el motor depende de ellos.
+
+`.\job.cmd roles` (o `./job.sh roles`) lista el elenco resultante (proyecto + tool).
+
+Para el modo interactivo de Claude Code, los equivalentes están en `.claude/agents/`.

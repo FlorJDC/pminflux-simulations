@@ -1,0 +1,67 @@
+Cargando PSFs experimentales...
+  Grid(400x400 px, 1.0 nm/px -> 400 nm FOV)
+  FWHM ajustado a las donas medidas: 343.9 nm (error de ajuste < 0.8%)
+  radio del anillo: 206.5 nm   [referencias: SimuFLUX 186 nm, Tarkowski & Stefani 216 nm]
+  profundidad del cero por haz: 9.0%, 8.7%, 10.4%, 11.0%   [Balzarotti 2017 reporta < 0.2 %]
+
+EBP "Ideal"  |  K=4  |  Grid(400x400 px, 1.0 nm/px -> 400 nm FOV)
+   haz    x [nm]    y [nm]  |r-r0| [nm]
+     0      0.00      0.00         0.00
+     1    -44.70    -25.81        51.61
+     2     44.70    -25.81        51.61
+     3      0.00     51.61        51.61
+  L_eff = 103.23 nm  |  asimetria = 0.00 nm  |  centroide = (+0.00, -0.00) nm
+
+EBP "Geometría medida
++ donas perfectas"  |  K=4  |  Grid(400x400 px, 1.0 nm/px -> 400 nm FOV)
+   haz    x [nm]    y [nm]  |r-r0| [nm]
+     0      0.00      0.00         0.00
+     1    -44.00    -27.00        51.62
+     2     45.00    -26.00        51.97
+     3     -5.00     51.00        51.24
+  L_eff = 103.23 nm  |  asimetria = 0.30 nm  |  centroide = (-1.00, -0.50) nm
+
+EBP "Experimental"  |  K=4  |  Grid(400x400 px, 1.0 nm/px -> 400 nm FOV)
+   haz    x [nm]    y [nm]  |r-r0| [nm]
+     0      0.00      0.00         0.00
+     1    -44.00    -27.00        51.62
+     2     45.00    -26.00        51.97
+     3     -5.00     51.00        51.24
+  L_eff = 103.23 nm  |  asimetria = 0.30 nm  |  centroide = (-1.00, -0.50) nm
+
+Emisor r0 = [ 5. -5.] nm  ->  pixel (205, 205)
+Radio de búsqueda del MLE: 77.4 nm
+
+Calculando CRB...
+  ideal      CRB(r0) =   0.87 nm
+  geom_exp   CRB(r0) =   0.88 nm
+c:\Users\BANGHO\Documents\GithubPRO\p-minflux-main\tools\tools_simulations.py:698: RuntimeWarning: divide by zero encountered in divide
+  σ_CRB = np.sqrt(1/(d*N))*np.sqrt(E/F)
+  exp        CRB(r0) =   2.00 nm
+
+Simulando...
+  semilla = 20260825 (resultados reproducibles)
+    Ideal: 25/1000
+    Ideal: 1000/1000
+    Geom. medida honesta: 25/1000
+    Geom. medida honesta: 1000/1000
+    Geom. medida ingenua: 25/1000
+    Geom. medida ingenua: 1000/1000
+    Experimental honesta: 25/1000
+    Experimental honesta: 975/1000
+    Experimental honesta: 1000/1000
+    Experimental ingenua: 25/1000
+    Experimental ingenua: 1000/1000
+
+======================================================================================
+caso                      CRB        std_x        std_y       |sesgo|         RMSE  RMSE/CRB
+--------------------------------------------------------------------------------------
+Ideal                    0.87    0.89±0.02    0.92±0.02     0.12±0.04    0.91±0.02      1.05
+Geom. medida honesta     0.88    0.91±0.02    0.97±0.02     0.08±0.04    0.94±0.02      1.07
+Geom. medida ingenua     0.88    0.85±0.02    0.94±0.02     0.38±0.04    0.94±0.02      1.06
+Experimental honesta     2.00    1.84±0.04    2.11±0.05     0.12±0.09    1.98±0.04      0.99
+Experimental ingenua     2.00    4.30±0.10   21.28±0.48    62.76±0.69   46.96±1.05     23.45
+======================================================================================
+1000 muestras por caso; incertidumbres = error estándar del estadístico.
+RMSE/CRB ~ 1  -> el estimador alcanza el límite teórico (sólo varianza)
+RMSE/CRB >> 1 -> hay sesgo: no se corrige juntando más fotones

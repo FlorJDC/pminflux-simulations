@@ -1,0 +1,7 @@
+{
+  "_comment": "Límites a lo que el PI puede elegir cuando dota un trabajo (--pi / job staff). Tiene prioridad sobre el policy.json del tool. max_workers acota su pedido WORKERS:, effort_max acota el esfuerzo por rol, backends_allowed restringe los backends. Cada recorte queda en log.jsonl. NO limita tus propias flags (--role/--effort): tú eres la persona a cargo. budget_tokens_max está reservado.",
+  "backends_allowed": ["claude", "codex"],
+  "effort_max": "high",
+  "max_workers": 3,
+  "budget_tokens_max": 800000
+}

@@ -1,0 +1,16 @@
+{
+  "name": "wiki",
+  "description": "Build/ingest a wiki (html) with backlinks and an adversarial consistency audit.",
+  "kind": "understanding",
+  "workdir": "job",
+  "team": {
+    "lead": "pi",
+    "workers": ["worker"],
+    "verifier": "verifier",
+    "extra": ["writer"]
+  },
+  "deliverable": { "type": "html", "path": "out/wiki/index.html" },
+  "provenance": { "registry": "out/provenance.json" },
+  "checks": { "command": "python {TOOL}/bin/check_provenance.py out/wiki/index.html out/provenance.json" },
+  "defaults": { "rounds": 4, "worker_count": 2, "budget_tokens": 300000 }
+}
